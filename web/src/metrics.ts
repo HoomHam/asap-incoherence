@@ -133,7 +133,7 @@ export function dipole(kx: Float32Array, ky: Float32Array, kz: Float32Array,
 }
 
 /** Trilinear sample of volume at fractional (x,y,z). Nearest at edges. */
-function trilinear(vol: Float32Array, n: number, x: number, y: number, z: number): number {
+export function trilinear(vol: Float32Array, n: number, x: number, y: number, z: number): number {
   const cl = (v: number) => Math.min(Math.max(v, 0), n - 1);
   x = cl(x); y = cl(y); z = cl(z);
   const x0 = Math.floor(x), y0 = Math.floor(y), z0 = Math.floor(z);

@@ -97,7 +97,7 @@ function currentEnsemble(): number[] {
 
 // ---------------------------------------------------------------- views
 
-const VIEWS = ['curves', 'points', 'proj', 'psf', 'fan', 'poly', 'compare', 'about'];
+const VIEWS = ['curves', 'points', 'proj', 'psf', 'fan', 'fountain', 'poly', 'compare', 'about'];
 let activeView = 'curves';
 for (const btn of $('tabs').querySelectorAll('button')) {
   btn.addEventListener('click', () => {
@@ -138,6 +138,11 @@ function renderActive() {
     } else if (activeView === 'poly' && !rendered.has('poly')) {
       renderPolyhedron();
       rendered.add('poly');
+    } else if (activeView === 'fountain' && lastPsf && !rendered.has('fountain')) {
+      plots.plotFountain($('plot-fountain'), lastPsf,
+        ($('fountain-plane') as HTMLSelectElement).value as 'xy' | 'xz' | 'yz',
+        ($('fountain-field') as HTMLSelectElement).value as 'ens' | 'full' | 'alias');
+      rendered.add('fountain');
     }
   } catch (e) {
     setStatus(e instanceof Error ? e.message : String(e), 'error');
@@ -158,6 +163,8 @@ function updateViews() {
 $('btn-view').addEventListener('click', updateViews);
 $('color-mode').addEventListener('change', updateViews);
 $('poly-which').addEventListener('change', () => { rendered.delete('poly'); renderActive(); });
+for (const id of ['fountain-field', 'fountain-plane'])
+  $(id).addEventListener('change', () => { rendered.delete('fountain'); renderActive(); });
 $('ens-expr').addEventListener('keydown', (e) => { if ((e as KeyboardEvent).key === 'Enter') updateViews(); });
 
 // ---------------------------------------------------------------- polyhedron
@@ -266,7 +273,7 @@ $('btn-psf').addEventListener('click', async () => {
   ($('btn-psf') as HTMLButtonElement).disabled = true;
   try {
     lastPsf = await request<PsfResult>('psf', { ilvs, n, label });
-    rendered.delete('psf'); rendered.delete('fan');
+    rendered.delete('psf'); rendered.delete('fan'); rendered.delete('fountain');
     ($('btn-compare') as HTMLButtonElement).disabled = false;
     setStatus(`PSF done — max/noise-like = ${lastPsf.aliasStats.coh.toFixed(2)}`);
     if (activeView !== 'psf' && activeView !== 'fan') {

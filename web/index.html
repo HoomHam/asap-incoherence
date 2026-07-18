@@ -138,6 +138,7 @@
           <button data-view="psf">PSF &amp; alias</button>
           <button data-view="fan">Fan views</button>
           <button data-view="poly">Polyhedron</button>
+          <button data-view="fountain">PSF fountain</button>
           <button data-view="compare">Compare</button>
           <button data-view="about">About / validation</button>
         </div>
@@ -154,6 +155,22 @@
           <div class="plot" id="plot-alias"></div>
         </div>
         <div class="view" id="view-fan"><div class="plot tall" id="plot-fan"></div></div>
+        <div class="view" id="view-fountain">
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px">
+            <select id="fountain-field">
+              <option value="ens" selected>ensemble PSF</option>
+              <option value="full">full-set PSF</option>
+              <option value="alias">alias field</option>
+            </select>
+            <select id="fountain-plane">
+              <option value="xy" selected>xy plane</option>
+              <option value="xz">xz plane</option>
+              <option value="yz">yz plane</option>
+            </select>
+            <span class="note" style="margin:0">360 rays, 512 points each, height = log₁₀|PSF| — compute a PSF first</span>
+          </div>
+          <div class="plot tall" id="plot-fountain"></div>
+        </div>
         <div class="view" id="view-poly">
           <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px">
             <select id="poly-which">

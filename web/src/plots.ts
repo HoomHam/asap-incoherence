@@ -7,7 +7,7 @@ import Plotly from 'plotly.js-dist-min';
 type PlotlyData = Record<string, unknown>;
 type PlotlyLayout = Record<string, unknown>;
 import type { TrajData, PsfResult } from './types';
-import { absVol, fanView } from './metrics';
+import { absVol, fanView, trilinear } from './metrics';
 
 const DARK = {
   paper_bgcolor: '#14161c',
@@ -324,6 +324,63 @@ export function plotPolyhedron(el: HTMLElement, pts: Float32Array, count: number
     } as PlotlyData,
   ];
   Plotly.react(el, traces, layout3d(title), { responsive: true });
+}
+
+/** PSF fountain: one 3D curve per ray angle (360 rays, 1 deg step), 512 samples
+ *  along r in [0, n/2-2], height = log10|field|. NaN-separated single trace,
+ *  turbo by ray angle. */
+export function plotFountain(el: HTMLElement, r: PsfResult,
+                             plane: 'xy' | 'xz' | 'yz',
+                             field: 'ens' | 'full' | 'alias'): void {
+  if (!HAS_WEBGL) { webglNotice(el, 'PSF fountain'); return; }
+  const vol = field === 'ens' ? absVol(r.psfRe, r.psfIm)
+            : field === 'full' ? absVol(r.fullRe, r.fullIm)
+            : absVol(r.aliasRe, r.aliasIm);
+  const n = r.n, c = n >> 1;
+  const NPTSR = 512;                      // sample points along each ray
+  const rMax = c - 2;
+  const NTH = 360;
+  const total = NTH * (NPTSR + 1);        // +1 for NaN separator
+  const xs = new Array<number | null>(total);
+  const ys = new Array<number | null>(total);
+  const zs = new Array<number | null>(total);
+  const cs = new Array<number>(total);
+  let o = 0;
+  for (let t = 0; t < NTH; t++) {
+    const th = (t * Math.PI) / 180;
+    const ca = Math.cos(th), sa = Math.sin(th);
+    for (let i = 0; i < NPTSR; i++) {
+      const rad = (i / (NPTSR - 1)) * rMax;
+      const a = c + rad * ca, b = c + rad * sa;
+      let vx = c, vy = c, vz = c;
+      if (plane === 'xy') { vx = a; vy = b; }
+      else if (plane === 'xz') { vx = a; vz = b; }
+      else { vy = a; vz = b; }
+      xs[o] = rad * ca; ys[o] = rad * sa;
+      zs[o] = Math.log10(trilinear(vol, n, vx, vy, vz) + 1e-5);
+      cs[o] = t; o++;
+    }
+    xs[o] = null; ys[o] = null; zs[o] = null; cs[o] = t; o++;  // break between rays
+  }
+  const fieldLabel = field === 'ens' ? r.label : field === 'full' ? 'full set' : `alias (${r.label} − full)`;
+  const trace: PlotlyData = {
+    type: 'scatter3d', mode: 'lines', x: xs, y: ys, z: zs,
+    line: {
+      color: cs, colorscale: TURBO_SCALE, cmin: 0, cmax: NTH - 1, width: 1.5,
+      colorbar: { title: { text: 'ray θ (deg)' }, thickness: 12, len: 0.6 },
+    },
+    hoverinfo: 'skip',
+  } as PlotlyData;
+  Plotly.react(el, [trace], {
+    ...layout3d(`PSF fountain — ${fieldLabel}, ${plane} central plane · 360 rays × 512 points, height = log₁₀|PSF|`),
+    scene: {
+      xaxis: { ...AXIS, backgroundcolor: '#14161c', showbackground: true, title: { text: `${plane[0]} (vox)` } },
+      yaxis: { ...AXIS, backgroundcolor: '#14161c', showbackground: true, title: { text: `${plane[1]} (vox)` } },
+      zaxis: { ...AXIS, backgroundcolor: '#14161c', showbackground: true, title: { text: 'log₁₀|PSF|' } },
+      aspectmode: 'cube',
+      camera: { eye: { x: 1.5, y: -1.5, z: 0.8 } },
+    },
+  } as PlotlyLayout, { responsive: true });
 }
 
 export function purge(el: HTMLElement): void {
