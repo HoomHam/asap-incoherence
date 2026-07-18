@@ -40,15 +40,20 @@ function generate(params: GenParams): TrajData {
   );
   if (!total) throw new Error('kasap_generate failed (allocation)');
   const grab = (ptr: number, len: number) => M.HEAPF32.slice(ptr >> 2, (ptr >> 2) + len);
+  const kx = grab(M._kasap_get_kx(), total);
+  const ky = grab(M._kasap_get_ky(), total);
+  const kz = grab(M._kasap_get_kz(), total);
+  let nanCount = 0;
+  for (let i = 0; i < total; i++)
+    if (Number.isNaN(kx[i]) || Number.isNaN(ky[i]) || Number.isNaN(kz[i])) nanCount++;
   traj = {
     total, NI: params.NI, NPTS: params.NPTS, NREPS: params.NREPS,
-    kx: grab(M._kasap_get_kx(), total),
-    ky: grab(M._kasap_get_ky(), total),
-    kz: grab(M._kasap_get_kz(), total),
+    kx, ky, kz,
     basis: grab(M._kasap_get_basis(), params.NI * 3),
     reprot: grab(M._kasap_get_reprot(), params.NREPS * 3),
     kmax: params.ms / (2 * params.fov),
     fov: params.fov, ms: params.ms,
+    nanCount,
   };
   curParams = params;
   fullPsfCache.clear();
@@ -72,7 +77,14 @@ function sampleIndices(ilvs: number[]): Int32Array {
 function runPsf(idx: Int32Array, n: number): { re: Float32Array; im: Float32Array } {
   const t = traj!;
   const conv = (2 * Math.PI * t.fov) / t.ms; // omega = 2*pi*k_phys*fov/ms (F14)
-  const Msamp = idx.length;
+  // drop limit-violation (NaN) samples — they would poison the whole grid
+  const valid: number[] = [];
+  for (let i = 0; i < idx.length; i++) {
+    const l = idx[i];
+    if (!Number.isNaN(t.kx[l]) && !Number.isNaN(t.ky[l]) && !Number.isNaN(t.kz[l])) valid.push(l);
+  }
+  const Msamp = valid.length;
+  if (!Msamp) throw new Error('all samples of this ensemble are limit-violations (NaN) — adjust n / at / slew');
   const px = M._wasm_malloc(Msamp * 8), py = M._wasm_malloc(Msamp * 8), pz = M._wasm_malloc(Msamp * 8);
   try {
     // views must be taken AFTER all allocations (memory growth invalidates them)
@@ -80,7 +92,7 @@ function runPsf(idx: Int32Array, n: number): { re: Float32Array; im: Float32Arra
     const wy = M.HEAPF64.subarray(py >> 3, (py >> 3) + Msamp);
     const wz = M.HEAPF64.subarray(pz >> 3, (pz >> 3) + Msamp);
     for (let i = 0; i < Msamp; i++) {
-      const l = idx[i];
+      const l = valid[i];
       wx[i] = t.kx[l] * conv; wy[i] = t.ky[l] * conv; wz[i] = t.kz[l] * conv;
     }
     if (!M._nufft_psf(px, py, pz, Msamp, n)) throw new Error(`nufft_psf failed (n=${n}, M=${Msamp})`);

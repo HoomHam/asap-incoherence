@@ -37,6 +37,7 @@ export interface TrajData {
   kmax: number;          // design kmax = ms/(2 fov)
   fov: number;
   ms: number;
+  nanCount: number;      // samples where the generator hit a limit violation
 }
 
 export interface ShellProfile {

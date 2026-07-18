@@ -188,8 +188,10 @@ $('btn-generate').addEventListener('click', async () => {
     lastPsf = null;
     rendered.clear();
     const totalIlv = traj.NI * traj.NREPS;
-    $('gen-info').textContent =
-      `${totalIlv} interleaves (${traj.NI} × ${traj.NREPS}), ${traj.total.toLocaleString()} samples, kmax ${traj.kmax.toFixed(1)} c/m`;
+    $('gen-info').innerHTML =
+      `${totalIlv} interleaves (${traj.NI} × ${traj.NREPS}), ${traj.total.toLocaleString()} samples, kmax ${traj.kmax.toFixed(1)} c/m` +
+      (traj.nanCount ? `<br><span style="color:#e0526b">⚠ ${traj.nanCount.toLocaleString()} samples violate slew/gradient limits ` +
+        `(NaN — dropped from PSF). Lower n toward 2, lengthen readout, or raise limits.</span>` : '');
     setStatus(`trajectory ready — ${totalIlv} interleaves`);
     renderActive();
   } catch { /* status already set */ }
