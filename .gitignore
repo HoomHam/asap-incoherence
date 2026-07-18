@@ -4,3 +4,6 @@ workspace/
 __pycache__/
 node_modules/
 web/dist/
+web/node_modules/
+web/src/wasm/kasap.js
+web/src/wasm/kasap.wasm

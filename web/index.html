@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ASAP Incoherence Explorer</title>
+  <style>
+    :root {
+      --bg: #0e1015; --panel: #14161c; --panel2: #1a1d26; --border: #2a2e3a;
+      --ink: #c9ccd4; --ink2: #8a8f9c; --accent: #5b8fd9; --accent2: #e0526b;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink);
+           font: 13px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif; }
+    #app { display: grid; grid-template-columns: 300px 1fr; height: 100vh; }
+    #sidebar { background: var(--panel); border-right: 1px solid var(--border);
+               padding: 14px; overflow-y: auto; }
+    #sidebar h1 { font-size: 15px; margin: 0 0 2px; color: #e8e9ee; }
+    #sidebar .sub { color: var(--ink2); font-size: 11px; margin-bottom: 12px; }
+    fieldset { border: 1px solid var(--border); border-radius: 6px; margin: 0 0 10px; padding: 8px 10px; }
+    legend { color: var(--ink2); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; padding: 0 4px; }
+    label.row { display: flex; justify-content: space-between; align-items: center; margin: 5px 0; gap: 8px; }
+    label.row span { color: var(--ink2); }
+    input[type=number], input[type=text], select {
+      background: var(--panel2); border: 1px solid var(--border); color: var(--ink);
+      border-radius: 4px; padding: 3px 6px; width: 90px; font: inherit; }
+    input[type=text] { width: 100%; }
+    input[type=range] { width: 130px; accent-color: var(--accent); }
+    button { background: var(--accent); color: #0e1015; font-weight: 600; border: 0;
+             border-radius: 5px; padding: 7px 12px; cursor: pointer; font: inherit; }
+    button:hover { filter: brightness(1.1); }
+    button.secondary { background: var(--panel2); color: var(--ink); border: 1px solid var(--border); }
+    button:disabled { opacity: 0.45; cursor: default; }
+    #main { display: flex; flex-direction: column; overflow: hidden; }
+    #topbar { display: flex; gap: 8px; align-items: center; padding: 8px 14px;
+              background: var(--panel); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+    #tabs { display: flex; gap: 2px; }
+    #tabs button { background: transparent; color: var(--ink2); border: 0; border-bottom: 2px solid transparent;
+                   border-radius: 0; padding: 6px 10px; font-weight: 500; }
+    #tabs button.active { color: #e8e9ee; border-bottom-color: var(--accent); }
+    #status { margin-left: auto; color: var(--ink2); font-size: 12px; max-width: 420px;
+              white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #status.busy { color: #d9a94f; }
+    #status.error { color: var(--accent2); }
+    #content { flex: 1; overflow: auto; padding: 12px; }
+    .view { display: none; }
+    .view.active { display: block; }
+    .plot { width: 100%; min-height: 480px; background: var(--panel); border-radius: 8px;
+            border: 1px solid var(--border); margin-bottom: 12px; }
+    .plot.tall { min-height: 720px; }
+    .note { color: var(--ink2); font-size: 12px; margin: -6px 0 10px 2px; }
+    table.metrics { border-collapse: collapse; margin: 8px 0 14px; }
+    table.metrics th, table.metrics td { border: 1px solid var(--border); padding: 5px 12px; text-align: right; }
+    table.metrics th { background: var(--panel2); color: var(--ink2); font-weight: 500; text-align: left; }
+    table.metrics td.name { text-align: left; color: var(--ink2); }
+    .headline { color: #e8e9ee; font-weight: 600; }
+    #ensbar { display: flex; gap: 8px; align-items: center; padding: 8px 14px;
+              background: var(--panel2); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+    #ensbar input { flex: 1; min-width: 200px; }
+    #about { max-width: 880px; }
+    #about h2 { color: #e8e9ee; font-size: 15px; }
+    #about code { background: var(--panel2); padding: 1px 5px; border-radius: 3px; }
+    #about img { max-width: 100%; border-radius: 6px; border: 1px solid var(--border); margin: 6px 0; }
+    a { color: var(--accent); }
+    .pill { background: var(--panel2); border: 1px solid var(--border); border-radius: 999px;
+            padding: 2px 10px; font-size: 11px; color: var(--ink2); }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="sidebar">
+      <h1>ASAP Incoherence Explorer</h1>
+      <div class="sub">bent-spiral trajectories · PSF · alias incoherence — all in-browser (WASM)</div>
+
+      <fieldset>
+        <legend>Generator</legend>
+        <label class="row"><span># charges (NI)</span><input type="number" id="p-NI" min="1" max="128" value="26"></label>
+        <label class="row"><span>points / ilv (NPTS)</span><input type="number" id="p-NPTS" min="64" max="2048" value="512"></label>
+        <label class="row"><span># rotations (NREPS)</span><input type="number" id="p-NREPS" min="1" max="128" value="32"></label>
+        <label class="row"><span>shape power n</span><input type="number" id="p-n" min="1.5" max="4" step="0.1" value="2.0"></label>
+        <label class="row"><span>FOV (m)</span><input type="number" id="p-fov" min="0.05" max="1" step="0.01" value="0.35"></label>
+        <label class="row"><span>matrix (ms)</span><input type="number" id="p-ms" min="16" max="512" value="160"></label>
+        <label class="row"><span>readout at (ms)</span><input type="number" id="p-at" min="0.5" max="60" step="0.01" value="5.12"></label>
+        <label class="row"><span>Thomson opt.</span><input type="checkbox" id="p-opt" checked></label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Rotation shaping</legend>
+        <label class="row"><span>rep angle <b id="rotAngleVal">90°</b></span>
+          <input type="range" id="p-rot" min="0" max="180" step="1" value="90"></label>
+        <label class="row"><span>rep axis</span>
+          <select id="p-axismode"><option value="hedgehog">Thomson hedgehog</option><option value="fixed">fixed axis</option></select></label>
+        <label class="row" id="fixedaxis-row" style="display:none"><span>axis x,y,z</span>
+          <input type="text" id="p-axis" value="0,0,1" style="width:90px"></label>
+      </fieldset>
+
+      <details>
+        <summary style="color:var(--ink2); cursor:pointer; margin-bottom:8px">advanced (slew / timing)</summary>
+        <fieldset>
+          <label class="row"><span>max slew (T/m/s)</span><input type="number" id="p-maxs" min="10" max="1000" value="150"></label>
+          <label class="row"><span>max grad (T/m)</span><input type="number" id="p-maxg" min="0.005" max="0.2" step="0.005" value="0.04"></label>
+          <label class="row"><span>t0 (µs)</span><input type="number" id="p-t0" min="0" max="500" value="40"></label>
+          <label class="row"><span>dwell dt (µs)</span><input type="number" id="p-dt" min="1" max="100" value="10"></label>
+        </fieldset>
+      </details>
+
+      <button id="btn-generate" style="width:100%">Generate trajectory</button>
+      <div class="note" id="gen-info" style="margin-top:8px"></div>
+
+      <fieldset style="margin-top:10px">
+        <legend>PSF settings</legend>
+        <label class="row"><span>image size N</span>
+          <select id="p-psfn"><option>32</option><option selected>64</option><option>128</option></select></label>
+        <div class="note" style="margin:4px 0 0">N=128 is slow (~minutes for full set)</div>
+      </fieldset>
+    </div>
+
+    <div id="main">
+      <div id="ensbar">
+        <span class="pill">ensemble</span>
+        <input type="text" id="ens-expr" value="block:0" spellcheck="false"
+               title="all | 0-25 | block:k | rot:j | off:o | every:s[:from] — comma-separated union">
+        <select id="ens-preset"></select>
+        <button id="btn-view" class="secondary">Update views</button>
+        <button id="btn-psf">Compute PSF</button>
+        <button id="btn-compare" class="secondary" disabled>+ compare</button>
+      </div>
+      <div id="topbar">
+        <div id="tabs">
+          <button data-view="curves" class="active">3D curves</button>
+          <button data-view="points">3D coverage</button>
+          <button data-view="proj">Projections</button>
+          <button data-view="psf">PSF &amp; alias</button>
+          <button data-view="fan">Fan views</button>
+          <button data-view="compare">Compare</button>
+          <button data-view="about">About / validation</button>
+        </div>
+        <div id="status">loading WASM…</div>
+      </div>
+      <div id="content">
+        <div class="view active" id="view-curves"><div class="note" id="note-curves"></div><div class="plot tall" id="plot-curves"></div></div>
+        <div class="view" id="view-points"><div class="note" id="note-points"></div><div class="plot tall" id="plot-points"></div></div>
+        <div class="view" id="view-proj"><div class="note" id="note-proj"></div><div class="plot" id="plot-proj"></div></div>
+        <div class="view" id="view-psf">
+          <div id="metrics-box"></div>
+          <div class="plot" id="plot-slices"></div>
+          <div class="plot" id="plot-shells"></div>
+          <div class="plot" id="plot-alias"></div>
+        </div>
+        <div class="view" id="view-fan"><div class="plot tall" id="plot-fan"></div></div>
+        <div class="view" id="view-compare"><div id="compare-box"><p class="note">Compute a PSF, then press “+ compare” to pin up to 4 ensembles side by side.</p></div></div>
+        <div class="view" id="view-about"><div id="about"></div></div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
