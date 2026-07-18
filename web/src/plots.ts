@@ -34,6 +34,16 @@ function detectWebGL(): boolean {
 }
 export const HAS_WEBGL = detectWebGL();
 
+export type ColorMode = 'charge' | 'rot' | 'global';
+
+/** Color value + scale range + label for one interleave under a color mode. */
+function colorOf(mode: ColorMode, g: number, NI: number, NREPS: number):
+    { v: number; vmax: number; label: string } {
+  if (mode === 'charge') return { v: g % NI, vmax: Math.max(NI - 1, 1), label: 'charge' };
+  if (mode === 'rot') return { v: Math.floor(g / NI), vmax: Math.max(NREPS - 1, 1), label: 'rotation' };
+  return { v: g, vmax: Math.max(NI * NREPS - 1, 1), label: 'ilv' };
+}
+
 function webglNotice(el: HTMLElement, what: string): void {
   el.innerHTML = `<div style="padding:40px;color:#8a8f9c;font-size:13px">
     WebGL is unavailable in this browser, so the ${what} view cannot render.
@@ -80,7 +90,7 @@ function turbo(t: number): string {
 }
 
 /** 3D curves, one line per interleave, turbo by index. Caps at 256 curves. */
-export function plotCurves3D(el: HTMLElement, t: TrajData, ilvs: number[]): string | null {
+export function plotCurves3D(el: HTMLElement, t: TrajData, ilvs: number[], mode: ColorMode): string | null {
   if (!HAS_WEBGL) { webglNotice(el, '3D curves'); return null; }
   let note: string | null = null;
   let shown = ilvs;
@@ -90,39 +100,43 @@ export function plotCurves3D(el: HTMLElement, t: TrajData, ilvs: number[]): stri
     note = `showing every ${stride}ᵗʰ of ${ilvs.length} interleaves (curve cap 256)`;
   }
   const ptStride = strideFor(t.NPTS, 160);
-  const total = t.NI * t.NREPS;
   const traces = shown.map(g => {
     const s = ilvSamples(t, g, ptStride);
+    const c = colorOf(mode, g, t.NI, t.NREPS);
     return {
       type: 'scatter3d', mode: 'lines', ...s,
-      line: { color: turbo(g / Math.max(total - 1, 1)), width: 2 },
-      name: `ilv ${g}`, hoverinfo: 'name',
+      line: { color: turbo(c.v / c.vmax), width: 2 },
+      name: `ilv ${g} (charge ${g % t.NI}, rot ${Math.floor(g / t.NI)})`, hoverinfo: 'name',
     } as PlotlyData;
   });
-  Plotly.react(el, traces, layout3d('3D interleave curves (physical k, cycles/m — turbo = global interleave index)'), { responsive: true });
+  const lbl = colorOf(mode, 0, t.NI, t.NREPS).label;
+  Plotly.react(el, traces, layout3d(`3D interleave curves (physical k, cycles/m — turbo = ${lbl})`), { responsive: true });
   return note;
 }
 
 /** 3D point coverage: one scatter trace, 1-2 px points, turbo by ilv index. */
-export function plotPoints3D(el: HTMLElement, t: TrajData, ilvs: number[]): string | null {
+export function plotPoints3D(el: HTMLElement, t: TrajData, ilvs: number[], mode: ColorMode): string | null {
   if (!HAS_WEBGL) { webglNotice(el, '3D point coverage'); return null; }
   const budget = 180_000;
   const totalPts = ilvs.length * t.NPTS;
   const stride = Math.max(1, Math.ceil(totalPts / budget));
   const x: number[] = [], y: number[] = [], z: number[] = [], cv: number[] = [];
+  let vmax = 1, lbl = '';
   for (const g of ilvs) {
     const irep = Math.floor(g / t.NI), j = g % t.NI;
     const base = irep * t.NI * t.NPTS + j * t.NPTS;
+    const c = colorOf(mode, g, t.NI, t.NREPS);
+    vmax = c.vmax; lbl = c.label;
     for (let p = 0; p < t.NPTS; p += stride) {
-      x.push(t.kx[base + p]); y.push(t.ky[base + p]); z.push(t.kz[base + p]); cv.push(g);
+      x.push(t.kx[base + p]); y.push(t.ky[base + p]); z.push(t.kz[base + p]); cv.push(c.v);
     }
   }
   const trace: PlotlyData = {
     type: 'scatter3d', mode: 'markers', x, y, z,
     marker: {
       size: 1.3, opacity: 0.55, color: cv, colorscale: TURBO_SCALE,
-      cmin: 0, cmax: t.NI * t.NREPS - 1,
-      colorbar: { title: { text: 'ilv' }, thickness: 12, len: 0.6 },
+      cmin: 0, cmax: vmax,
+      colorbar: { title: { text: lbl }, thickness: 12, len: 0.6 },
     },
     hoverinfo: 'skip',
   } as PlotlyData;
@@ -131,23 +145,26 @@ export function plotPoints3D(el: HTMLElement, t: TrajData, ilvs: number[]): stri
 }
 
 /** 2D plane projections (points), xy / xz / yz side by side. */
-export function plotProjections(el: HTMLElement, t: TrajData, ilvs: number[]): string | null {
+export function plotProjections(el: HTMLElement, t: TrajData, ilvs: number[], mode: ColorMode): string | null {
   const budget = HAS_WEBGL ? 120_000 : 24_000;
   const totalPts = ilvs.length * t.NPTS;
   const stride = Math.max(1, Math.ceil(totalPts / budget));
   const ax: number[] = [], ay: number[] = [], az: number[] = [], cv: number[] = [];
+  let vmax = 1;
   for (const g of ilvs) {
     const irep = Math.floor(g / t.NI), j = g % t.NI;
     const base = irep * t.NI * t.NPTS + j * t.NPTS;
+    const c = colorOf(mode, g, t.NI, t.NREPS);
+    vmax = c.vmax;
     for (let p = 0; p < t.NPTS; p += stride) {
-      ax.push(t.kx[base + p]); ay.push(t.ky[base + p]); az.push(t.kz[base + p]); cv.push(g);
+      ax.push(t.kx[base + p]); ay.push(t.ky[base + p]); az.push(t.kz[base + p]); cv.push(c.v);
     }
   }
   const planes: [string, number[], number[]][] = [['xy', ax, ay], ['xz', ax, az], ['yz', ay, az]];
   const traces: PlotlyData[] = planes.map(([name, px, py], i) => ({
     type: HAS_WEBGL ? 'scattergl' : 'scatter', mode: 'markers', x: px, y: py,
     xaxis: `x${i + 1}`, yaxis: `y${i + 1}`,
-    marker: { size: 1.5, opacity: 0.4, color: cv, colorscale: TURBO_SCALE, cmin: 0, cmax: t.NI * t.NREPS - 1 },
+    marker: { size: 1.5, opacity: 0.4, color: cv, colorscale: TURBO_SCALE, cmin: 0, cmax: vmax },
     name, hoverinfo: 'skip', showlegend: false,
   } as PlotlyData));
   const axc = { ...AXIS, scaleanchor: undefined };

@@ -85,6 +85,10 @@ presetSel.addEventListener('change', () => {
   updateViews();
 });
 
+function colorMode(): plots.ColorMode {
+  return ($('color-mode') as HTMLSelectElement).value as plots.ColorMode;
+}
+
 function currentEnsemble(): number[] {
   if (!traj) throw new Error('generate first');
   return parseEnsemble(($('ens-expr') as HTMLInputElement).value, traj.NI, traj.NREPS);
@@ -110,15 +114,15 @@ function renderActive() {
   try {
     const ilvs = currentEnsemble();
     if (activeView === 'curves' && !rendered.has('curves')) {
-      const note = plots.plotCurves3D($('plot-curves'), traj, ilvs);
+      const note = plots.plotCurves3D($('plot-curves'), traj, ilvs, colorMode());
       $('note-curves').textContent = note ?? '';
       rendered.add('curves');
     } else if (activeView === 'points' && !rendered.has('points')) {
-      const note = plots.plotPoints3D($('plot-points'), traj, ilvs);
+      const note = plots.plotPoints3D($('plot-points'), traj, ilvs, colorMode());
       $('note-points').textContent = note ?? '';
       rendered.add('points');
     } else if (activeView === 'proj' && !rendered.has('proj')) {
-      const note = plots.plotProjections($('plot-proj'), traj, ilvs);
+      const note = plots.plotProjections($('plot-proj'), traj, ilvs, colorMode());
       $('note-proj').textContent = note ?? '';
       rendered.add('proj');
     } else if (activeView === 'psf' && lastPsf && !rendered.has('psf')) {
@@ -147,6 +151,7 @@ function updateViews() {
 }
 
 $('btn-view').addEventListener('click', updateViews);
+$('color-mode').addEventListener('change', updateViews);
 $('ens-expr').addEventListener('keydown', (e) => { if ((e as KeyboardEvent).key === 'Enter') updateViews(); });
 
 // ---------------------------------------------------------------- metrics table

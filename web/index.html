@@ -121,6 +121,11 @@
         <input type="text" id="ens-expr" value="block:0" spellcheck="false"
                title="all | 0-25 | block:k | rot:j | off:o | every:s[:from] — comma-separated union">
         <select id="ens-preset"></select>
+        <select id="color-mode" title="what the trajectory colors encode">
+          <option value="charge" selected>color: charge (0–NI−1)</option>
+          <option value="rot">color: rotation</option>
+          <option value="global">color: global index</option>
+        </select>
         <button id="btn-view" class="secondary">Update views</button>
         <button id="btn-psf">Compute PSF</button>
         <button id="btn-compare" class="secondary" disabled>+ compare</button>
