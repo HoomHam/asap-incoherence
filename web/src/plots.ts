@@ -364,11 +364,12 @@ export function plotFountain(el: HTMLElement, r: PsfResult,
   }
   const fieldLabel = field === 'ens' ? r.label : field === 'full' ? 'full set' : `alias (${r.label} − full)`;
   const trace: PlotlyData = {
-    type: 'scatter3d', mode: 'lines', x: xs, y: ys, z: zs,
+    type: 'scatter3d', mode: 'lines+markers', x: xs, y: ys, z: zs,
     line: {
-      color: cs, colorscale: TURBO_SCALE, cmin: 0, cmax: NTH - 1, width: 1.5,
+      color: cs, colorscale: TURBO_SCALE, cmin: 0, cmax: NTH - 1, width: 4,
       colorbar: { title: { text: 'ray θ (deg)' }, thickness: 12, len: 0.6 },
     },
+    marker: { size: 2.5, color: cs, colorscale: TURBO_SCALE, cmin: 0, cmax: NTH - 1, opacity: 0.85 },
     hoverinfo: 'skip',
   } as PlotlyData;
   Plotly.react(el, [trace], {
