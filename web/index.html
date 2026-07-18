@@ -137,6 +137,7 @@
           <button data-view="proj">Projections</button>
           <button data-view="psf">PSF &amp; alias</button>
           <button data-view="fan">Fan views</button>
+          <button data-view="poly">Polyhedron</button>
           <button data-view="compare">Compare</button>
           <button data-view="about">About / validation</button>
         </div>
@@ -153,6 +154,16 @@
           <div class="plot" id="plot-alias"></div>
         </div>
         <div class="view" id="view-fan"><div class="plot tall" id="plot-fan"></div></div>
+        <div class="view" id="view-poly">
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px">
+            <select id="poly-which">
+              <option value="basis" selected>charge basis (NI)</option>
+              <option value="reprot">rotation axes (NREPS)</option>
+            </select>
+            <span class="note" id="poly-name" style="margin:0"></span>
+          </div>
+          <div class="plot tall" id="plot-poly"></div>
+        </div>
         <div class="view" id="view-compare"><div id="compare-box"><p class="note">Compute a PSF, then press “+ compare” to pin up to 4 ensembles side by side.</p></div></div>
         <div class="view" id="view-about"><div id="about"></div></div>
       </div>

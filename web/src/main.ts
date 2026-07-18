@@ -43,6 +43,7 @@ worker.onmessage = (ev: MessageEvent<WorkerResponse>) => {
 // ---------------------------------------------------------------- state
 
 let traj: TrajData | null = null;
+let lastParams: GenParams = V3_DEFAULTS;
 let lastPsf: PsfResult | null = null;
 const compare: PsfResult[] = [];
 
@@ -96,7 +97,7 @@ function currentEnsemble(): number[] {
 
 // ---------------------------------------------------------------- views
 
-const VIEWS = ['curves', 'points', 'proj', 'psf', 'fan', 'compare', 'about'];
+const VIEWS = ['curves', 'points', 'proj', 'psf', 'fan', 'poly', 'compare', 'about'];
 let activeView = 'curves';
 for (const btn of $('tabs').querySelectorAll('button')) {
   btn.addEventListener('click', () => {
@@ -134,6 +135,9 @@ function renderActive() {
     } else if (activeView === 'fan' && lastPsf && !rendered.has('fan')) {
       plots.plotFans($('plot-fan'), lastPsf);
       rendered.add('fan');
+    } else if (activeView === 'poly' && !rendered.has('poly')) {
+      renderPolyhedron();
+      rendered.add('poly');
     }
   } catch (e) {
     setStatus(e instanceof Error ? e.message : String(e), 'error');
@@ -142,6 +146,7 @@ function renderActive() {
 
 function invalidateViews(alsoP = false) {
   rendered.delete('curves'); rendered.delete('points'); rendered.delete('proj');
+  rendered.delete('poly');
   if (alsoP) { rendered.delete('psf'); rendered.delete('fan'); }
 }
 
@@ -152,7 +157,54 @@ function updateViews() {
 
 $('btn-view').addEventListener('click', updateViews);
 $('color-mode').addEventListener('change', updateViews);
+$('poly-which').addEventListener('change', () => { rendered.delete('poly'); renderActive(); });
 $('ens-expr').addEventListener('keydown', (e) => { if ((e as KeyboardEvent).key === 'Enter') updateViews(); });
+
+// ---------------------------------------------------------------- polyhedron
+
+// Known Thomson-problem optimal configurations (global minima) by point count.
+const THOMSON_NAMES: Record<number, string> = {
+  2: 'antipodal pair',
+  3: 'equilateral triangle (equatorial)',
+  4: 'regular tetrahedron',
+  5: 'triangular bipyramid',
+  6: 'regular octahedron',
+  7: 'pentagonal bipyramid',
+  8: 'square antiprism (NOT a cube!)',
+  9: 'triaugmented triangular prism',
+  10: 'gyroelongated square bipyramid',
+  11: 'edge-contracted icosahedron',
+  12: 'regular icosahedron',
+  24: 'snub cube',
+  32: 'pentakis dodecahedron (icosahedron + dodecahedron vertices)',
+};
+
+function minPairAngleDeg(pts: Float32Array, count: number): number {
+  let maxDot = -2;
+  for (let i = 0; i < count; i++)
+    for (let j = i + 1; j < count; j++) {
+      const d = pts[3*i]*pts[3*j] + pts[3*i+1]*pts[3*j+1] + pts[3*i+2]*pts[3*j+2];
+      if (d > maxDot) maxDot = d;
+    }
+  return (Math.acos(Math.min(1, Math.max(-1, maxDot))) * 180) / Math.PI;
+}
+
+function renderPolyhedron() {
+  if (!traj) return;
+  const which = ($('poly-which') as HTMLSelectElement).value;
+  const pts = which === 'basis' ? traj.basis : traj.reprot;
+  const count = which === 'basis' ? traj.NI : traj.NREPS;
+  const what = which === 'basis' ? 'charge basis' : 'rotation-axis hedgehog';
+  const named = THOMSON_NAMES[count];
+  const nameTxt = lastParams.optimize
+    ? (named ? `N = ${count}: <b style="color:#e8e9ee">${named}</b> (Thomson optimum)`
+             : `N = ${count}: generic Thomson configuration — no named polyhedron`)
+    : `N = ${count}: Fibonacci spiral (Thomson optimization OFF — names apply only to optimized configs)`;
+  const ang = count > 1 ? ` · min pairwise angle ${minPairAngleDeg(pts, count).toFixed(1)}°` : '';
+  $('poly-name').innerHTML = nameTxt + ang;
+  plots.plotPolyhedron($('plot-poly'), pts, count,
+    `convex hull of the ${what} (${count} unit vectors)`);
+}
 
 // ---------------------------------------------------------------- metrics table
 
@@ -190,6 +242,7 @@ $('btn-generate').addEventListener('click', async () => {
   ($('btn-generate') as HTMLButtonElement).disabled = true;
   try {
     traj = await request<TrajData>('generate', { params });
+    lastParams = params;
     lastPsf = null;
     rendered.clear();
     const totalIlv = traj.NI * traj.NREPS;

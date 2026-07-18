@@ -299,6 +299,33 @@ export function plotFans(el: HTMLElement, r: PsfResult): void {
   Plotly.react(el, traces, lay as PlotlyLayout, { responsive: true });
 }
 
+/** Convex polyhedron of unit vectors: translucent hull (alphahull=0) + vertices. */
+export function plotPolyhedron(el: HTMLElement, pts: Float32Array, count: number,
+                               title: string): void {
+  if (!HAS_WEBGL) { webglNotice(el, 'polyhedron'); return; }
+  const x: number[] = [], y: number[] = [], z: number[] = [], txt: string[] = [];
+  for (let i = 0; i < count; i++) {
+    x.push(pts[3 * i]); y.push(pts[3 * i + 1]); z.push(pts[3 * i + 2]);
+    txt.push(`${i}`);
+  }
+  const traces: PlotlyData[] = [
+    {
+      type: 'mesh3d', x, y, z, alphahull: 0,
+      color: '#5b8fd9', opacity: 0.35, flatshading: true,
+      lighting: { ambient: 0.55, diffuse: 0.8, specular: 0.25, roughness: 0.6 },
+      hoverinfo: 'skip',
+    } as PlotlyData,
+    {
+      type: 'scatter3d', mode: 'markers+text', x, y, z, text: txt,
+      textfont: { color: '#e8e9ee', size: 10 },
+      textposition: 'top center',
+      marker: { size: 5, color: x.map((_, i) => turbo(i / Math.max(count - 1, 1))) },
+      hoverinfo: 'text', name: 'charges',
+    } as PlotlyData,
+  ];
+  Plotly.react(el, traces, layout3d(title), { responsive: true });
+}
+
 export function purge(el: HTMLElement): void {
   Plotly.purge(el);
 }
