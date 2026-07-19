@@ -244,7 +244,7 @@ function startPolyAnim() {
   let fax: [number, number, number] = [...lastParams.axis] as [number, number, number];
   const fn = Math.hypot(...fax) || 1;
   fax = [fax[0] / fn, fax[1] / fn, fax[2] / fn];
-  const REP_MS = 3600;                    // slow: see the action
+  const REP_MS = 6000;                    // slow: see the action
   const TRAIL = 18;                       // very short window: trail dies fast
   const t0 = performance.now();
   const el = $('plot-poly');
@@ -254,13 +254,9 @@ function startPolyAnim() {
   }));
   const step = () => {
     const el0 = performance.now() - t0;
-    if (el0 >= t.NREPS * REP_MS) {        // single pass, then stop on last frame
-      stopPolyAnim();
-      $('poly-frame').textContent = `done — ${t.NREPS} repetitions shown`;
-      return;
-    }
-    const rep = Math.floor(el0 / REP_MS) % t.NREPS;
-    const ph = (el0 % REP_MS) / REP_MS;
+    const done = el0 >= t.NREPS * REP_MS;  // single pass; last frame = full k
+    const rep = done ? t.NREPS - 1 : Math.floor(el0 / REP_MS);
+    const ph = done ? 1 : (el0 % REP_MS) / REP_MS;
     const axis: [number, number, number] = fixed
       ? fax
       : [t.reprot[3 * rep], t.reprot[3 * rep + 1], t.reprot[3 * rep + 2]];
@@ -278,6 +274,11 @@ function startPolyAnim() {
       `sequence animation — rep ${rep + 1}/${t.NREPS}`, trails);
     $('poly-frame').textContent =
       `rep ${rep + 1}/${t.NREPS} · rot ${((ang * 180) / Math.PI).toFixed(0)}° · r/kmax ${scale.toFixed(2)}`;
+    if (done) {
+      stopPolyAnim();
+      $('poly-frame').textContent = `done — ${t.NREPS} repetitions, resting at kmax`;
+      return;
+    }
     polyAnimId = requestAnimationFrame(step);
   };
   $('poly-animate').textContent = '⏸ stop';
