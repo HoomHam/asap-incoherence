@@ -254,28 +254,50 @@ function startPolyAnim() {
   const trails = Array.from({ length: t.NI }, () => ({
     x: [] as number[], y: [] as number[], z: [] as number[],
   }));
+  const discrete = ($('poly-mode') as HTMLSelectElement).value === 'discrete';
+  // global kmax from ilv 0, rep 0 — magnitude law is shared and rotations preserve |k|
+  let kmax = 1e-9;
+  for (let p = 0; p < t.NPTS; p++) kmax = Math.max(kmax, Math.hypot(t.kx[p], t.ky[p], t.kz[p]));
   const step = () => {
     const el0 = performance.now() - t0;
     const done = el0 >= t.NREPS * REP_MS;  // single pass; last frame = full k
     const rep = done ? t.NREPS - 1 : Math.floor(el0 / REP_MS);
     const ph = done ? 1 : (el0 % REP_MS) / REP_MS;
-    const axis: [number, number, number] = fixed
-      ? fax
-      : [t.reprot[3 * rep], t.reprot[3 * rep + 1], t.reprot[3 * rep + 2]];
-    // rotation and radial growth together across the repetition
-    const ang = rotAngle * ph;
-    const scale = Math.max(prof[Math.min(t.NPTS - 1, Math.floor(ph * (t.NPTS - 1)))], 0.06);
-    for (let j = 0; j < t.NI; j++) {
-      const v = rodrigues([t.basis[3 * j], t.basis[3 * j + 1], t.basis[3 * j + 2]], axis, ang);
-      scratch[3 * j] = v[0] * scale; scratch[3 * j + 1] = v[1] * scale; scratch[3 * j + 2] = v[2] * scale;
-      const tr = trails[j];
-      tr.x.push(v[0] * scale); tr.y.push(v[1] * scale); tr.z.push(v[2] * scale);
-      if (tr.x.length > TRAIL) { tr.x.shift(); tr.y.shift(); tr.z.shift(); }
+    let scale: number;
+    if (discrete) {
+      // physical mode: actual k(t) samples of this rep — orientation snaps
+      // between reps (cumulative, as kasap applies it) and the path bends
+      const p = Math.min(t.NPTS - 1, Math.floor(ph * (t.NPTS - 1)));
+      scale = 0;
+      for (let j = 0; j < t.NI; j++) {
+        const lin = p + j * t.NPTS + rep * t.NI * t.NPTS;
+        const x = t.kx[lin] / kmax, y = t.ky[lin] / kmax, z = t.kz[lin] / kmax;
+        scratch[3 * j] = x; scratch[3 * j + 1] = y; scratch[3 * j + 2] = z;
+        scale = Math.max(scale, Math.hypot(x, y, z));
+        const tr = trails[j];
+        tr.x.push(x); tr.y.push(y); tr.z.push(z);
+        if (tr.x.length > TRAIL) { tr.x.shift(); tr.y.shift(); tr.z.shift(); }
+      }
+    } else {
+      // stylized morph: rotation and radial growth together across the repetition
+      const axis: [number, number, number] = fixed
+        ? fax
+        : [t.reprot[3 * rep], t.reprot[3 * rep + 1], t.reprot[3 * rep + 2]];
+      const ang = rotAngle * ph;
+      scale = Math.max(prof[Math.min(t.NPTS - 1, Math.floor(ph * (t.NPTS - 1)))], 0.06);
+      for (let j = 0; j < t.NI; j++) {
+        const v = rodrigues([t.basis[3 * j], t.basis[3 * j + 1], t.basis[3 * j + 2]], axis, ang);
+        scratch[3 * j] = v[0] * scale; scratch[3 * j + 1] = v[1] * scale; scratch[3 * j + 2] = v[2] * scale;
+        const tr = trails[j];
+        tr.x.push(v[0] * scale); tr.y.push(v[1] * scale); tr.z.push(v[2] * scale);
+        if (tr.x.length > TRAIL) { tr.x.shift(); tr.y.shift(); tr.z.shift(); }
+      }
     }
     plots.plotPolyhedron(el, scratch, t.NI,
       `sequence animation — rep ${rep + 1}/${t.NREPS}`, trails);
-    $('poly-frame').textContent =
-      `rep ${rep + 1}/${t.NREPS} · rot ${((ang * 180) / Math.PI).toFixed(0)}° · r/kmax ${scale.toFixed(2)}`;
+    $('poly-frame').textContent = discrete
+      ? `rep ${rep + 1}/${t.NREPS} · t ${(ph * lastParams.at * 1e3).toFixed(2)} ms · r/kmax ${scale.toFixed(2)}`
+      : `rep ${rep + 1}/${t.NREPS} · rot ${((rotAngle * ph * 180) / Math.PI).toFixed(0)}° · r/kmax ${scale.toFixed(2)}`;
     if (done) {
       stopPolyAnim();
       $('poly-frame').textContent = `done — ${t.NREPS} repetitions, resting at kmax`;
