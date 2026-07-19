@@ -38,7 +38,7 @@ int main(int argc, char **argv)
     fclose(f);
     printf("M = %d samples\n", M);
 
-    int n = 64;
+    int n = argc > 2 ? atoi(argv[2]) : 64;
     if (!nufft_psf(wx, wy, wz, M, n)) { fprintf(stderr, "psf full failed\n"); return 2; }
     dump("psf_full_native.raw", n);
     printf("full-set PSF done\n");

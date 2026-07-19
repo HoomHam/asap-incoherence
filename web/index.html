@@ -110,8 +110,9 @@
       <fieldset style="margin-top:10px">
         <legend>PSF settings</legend>
         <label class="row"><span>image size N</span>
-          <select id="p-psfn"><option>32</option><option selected>64</option><option>128</option></select></label>
-        <div class="note" style="margin:4px 0 0">N=128 is slow (~minutes for full set)</div>
+          <input type="number" id="p-psfn" min="16" max="128" step="2" value="64"></label>
+        <div class="note" style="margin:4px 0 0">any even size 16–128. Internal grid rounds up to a power
+          of two, so N&gt;64 costs the same as N=128 (slow full set)</div>
       </fieldset>
     </div>
 

@@ -264,7 +264,9 @@ $('btn-psf').addEventListener('click', async () => {
   let ilvs: number[];
   try { ilvs = currentEnsemble(); } catch (e) { setStatus(String(e), 'error'); return; }
   if (!ilvs.length) { setStatus('empty ensemble', 'error'); return; }
-  const n = parseInt(($('p-psfn') as HTMLSelectElement).value, 10);
+  let n = parseInt(($('p-psfn') as HTMLInputElement).value, 10) || 64;
+  n = Math.min(128, Math.max(16, n - (n % 2)));
+  ($('p-psfn') as HTMLInputElement).value = `${n}`;
   const label = ($('ens-expr') as HTMLInputElement).value.trim();
   ($('btn-psf') as HTMLButtonElement).disabled = true;
   try {

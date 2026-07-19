@@ -9,7 +9,8 @@
  *   PSF: A^H( DCF * A(delta) ), complex-normalized by center value
  *
  * Grids are float32 interleaved complex; kernel/deapod tables double.
- * FFT: iterative radix-2, power-of-two sizes only => image n in {32,64,128}.
+ * FFT: iterative radix-2; the oversampled grid rounds up to the next power
+ * of two, so any even image size n works (effective oversampling >= 2).
  */
 
 #include <stdlib.h>
@@ -229,7 +230,7 @@ static int deapod_n = 0;
 
 static void deapod_init(int n, int G)
 {
-    if (deapod_n == n) return;
+    if (deapod_n == n) return;   /* G is a pure function of n */
     free(deapod);
     deapod = malloc(n * sizeof(double));
     for (int i = 0; i < n; i++)
@@ -237,12 +238,22 @@ static void deapod_init(int n, int G)
     deapod_n = n;
 }
 
+/* Oversampled grid size: smallest power of two >= SIGMA*n, so the radix-2
+ * FFT applies for ANY image size n (effective oversampling >= SIGMA, which
+ * only improves the sigma=2 kernel accuracy). */
+static int grid_size(int n)
+{
+    int G = 1;
+    while (G < SIGMA * n) G <<= 1;
+    return G;
+}
+
 /* A^H: samples -> centered n^3 image (split re/im). Grid scratch provided. */
 static void adjoint_op(const double *wx, const double *wy, const double *wz,
                        const float *cre, const float *cim, int M, int n,
                        float *ire, float *iim, float *gre, float *gim)
 {
-    int G = SIGMA * n;
+    int G = grid_size(n);
     size_t G2 = (size_t)G * G;
     kb_init();
     deapod_init(n, G);
@@ -269,7 +280,7 @@ static void forward_op(const float *ire, const float *iim, int n,
                        const double *wx, const double *wy, const double *wz, int M,
                        float *cre, float *cim, float *gre, float *gim)
 {
-    int G = SIGMA * n;
+    int G = grid_size(n);
     size_t G2 = (size_t)G * G;
     kb_init();
     deapod_init(n, G);
@@ -310,8 +321,8 @@ EMSCRIPTEN_KEEPALIVE
 int nufft_psf(const double *wx, const double *wy, const double *wz,
               int M, int n)
 {
-    if (n < 8 || (n & (n - 1)) != 0) return 0;   /* power of two only */
-    int G = SIGMA * n;
+    if (n < 8 || (n & 1)) return 0;   /* even sizes, grid handles the rest */
+    int G = grid_size(n);
     size_t Nv = (size_t)n * n * n, Gv = (size_t)G * G * G;
 
     free(psf_re); free(psf_im); free(dcf_w);
