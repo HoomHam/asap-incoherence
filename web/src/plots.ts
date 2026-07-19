@@ -303,7 +303,8 @@ export function plotFans(el: HTMLElement, r: PsfResult): void {
  *  Optional trails: per-vertex drift history drawn as fading lines. */
 export function plotPolyhedron(el: HTMLElement, pts: Float32Array, count: number,
                                title: string,
-                               trails?: { x: number[]; y: number[]; z: number[] }[]): void {
+                               trails?: { x: number[]; y: number[]; z: number[] }[],
+                               camDist?: number): void {
   if (!HAS_WEBGL) { webglNotice(el, 'polyhedron'); return; }
   const x: number[] = [], y: number[] = [], z: number[] = [], txt: string[] = [];
   for (let i = 0; i < count; i++) {
@@ -352,13 +353,20 @@ export function plotPolyhedron(el: HTMLElement, pts: Float32Array, count: number
   const bare = { ...AXIS, backgroundcolor: '#14161c', showbackground: true,
                  title: { text: '' }, showticklabels: false };
   const range = [-1.05, 1.05];
+  // camDist set → animation drives the camera (along the default view diagonal);
+  // omit uirevision so plotly applies it every frame. Unset → static view, user
+  // camera preserved via uirevision.
+  const U = 0.5773502691896258; // 1/sqrt(3)
+  const scene: Record<string, unknown> = {
+    xaxis: { ...bare, range }, yaxis: { ...bare, range }, zaxis: { ...bare, range },
+    aspectmode: 'cube',
+  };
+  if (camDist !== undefined)
+    scene.camera = { eye: { x: camDist * U, y: camDist * U, z: camDist * U } };
   Plotly.react(el, traces, {
     ...layout3d(title),
-    uirevision: 'poly',
-    scene: {
-      xaxis: { ...bare, range }, yaxis: { ...bare, range }, zaxis: { ...bare, range },
-      aspectmode: 'cube',
-    },
+    ...(camDist === undefined ? { uirevision: 'poly' } : {}),
+    scene,
   } as PlotlyLayout, { responsive: true });
 }
 

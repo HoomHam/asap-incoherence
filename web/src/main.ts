@@ -258,6 +258,10 @@ function startPolyAnim() {
   // global kmax from ilv 0, rep 0 — magnitude law is shared and rotations preserve |k|
   let kmax = 1e-9;
   for (let p = 0; p < t.NPTS; p++) kmax = Math.max(kmax, Math.hypot(t.kx[p], t.ky[p], t.kz[p]));
+  // camera: start close on the small polyhedron, pull back as it grows.
+  // Tracks the running max radius (monotone — no per-rep bounce), smooth lag.
+  const CAM_FAR = 2.17;                   // plotly default eye distance
+  let camMax = 0, camDist = 0.85;
   const step = () => {
     const el0 = performance.now() - t0;
     const done = el0 >= t.NREPS * REP_MS;  // single pass; last frame = full k
@@ -293,8 +297,11 @@ function startPolyAnim() {
         if (tr.x.length > TRAIL) { tr.x.shift(); tr.y.shift(); tr.z.shift(); }
       }
     }
+    camMax = Math.max(camMax, scale);
+    const camTarget = done ? CAM_FAR : Math.min(CAM_FAR, 0.75 + 1.45 * camMax);
+    camDist += (camTarget - camDist) * 0.08;
     plots.plotPolyhedron(el, scratch, t.NI,
-      `sequence animation — rep ${rep + 1}/${t.NREPS}`, trails);
+      `sequence animation — rep ${rep + 1}/${t.NREPS}`, trails, done ? CAM_FAR : camDist);
     $('poly-frame').textContent = discrete
       ? `rep ${rep + 1}/${t.NREPS} · t ${(ph * lastParams.at * 1e3).toFixed(2)} ms · r/kmax ${scale.toFixed(2)}`
       : `rep ${rep + 1}/${t.NREPS} · rot ${((rotAngle * ph * 180) / Math.PI).toFixed(0)}° · r/kmax ${scale.toFixed(2)}`;
