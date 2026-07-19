@@ -310,11 +310,19 @@ export function plotPolyhedron(el: HTMLElement, pts: Float32Array, count: number
     x.push(pts[3 * i]); y.push(pts[3 * i + 1]); z.push(pts[3 * i + 2]);
     txt.push(`${i}`);
   }
-  const trailTraces: PlotlyData[] = (trails ?? []).map((tr, i) => ({
-    type: 'scatter3d', mode: 'lines', x: tr.x, y: tr.y, z: tr.z,
-    line: { color: turbo(i / Math.max(count - 1, 1)), width: 2.5 },
-    opacity: 0.45, hoverinfo: 'skip', showlegend: false,
-  } as PlotlyData));
+  const trailTraces: PlotlyData[] = (trails ?? []).map((tr, i) => {
+    // jet-trail fade: oldest points sink into the background, newest full color
+    const ramp = tr.x.map((_, k) => k / Math.max(tr.x.length - 1, 1));
+    return {
+      type: 'scatter3d', mode: 'lines', x: tr.x, y: tr.y, z: tr.z,
+      line: {
+        color: ramp, cmin: 0, cmax: 1, width: 3,
+        colorscale: [[0, '#14161c'], [1, turbo(i / Math.max(count - 1, 1))]],
+        showscale: false,
+      },
+      hoverinfo: 'skip', showlegend: false,
+    } as PlotlyData;
+  });
   const traces: PlotlyData[] = [
     ...trailTraces,
     {
