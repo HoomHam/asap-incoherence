@@ -171,12 +171,12 @@
           <div class="plot tall" id="plot-fountain"></div>
         </div>
         <div class="view active" id="view-poly">
-          <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px">
-            <select id="poly-which">
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:8px">
+            <button id="poly-animate" style="flex-shrink:0">▶ animate sequence</button>
+            <select id="poly-which" style="flex-shrink:0">
               <option value="basis" selected>charge basis (NI)</option>
               <option value="reprot">rotation axes (NREPS)</option>
             </select>
-            <button id="poly-animate" class="secondary">▶ animate sequence</button>
             <span class="note" id="poly-frame" style="margin:0"></span>
             <span class="note" id="poly-name" style="margin:0"></span>
           </div>
