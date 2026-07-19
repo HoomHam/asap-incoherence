@@ -244,7 +244,7 @@ function startPolyAnim() {
   let fax: [number, number, number] = [...lastParams.axis] as [number, number, number];
   const fn = Math.hypot(...fax) || 1;
   fax = [fax[0] / fn, fax[1] / fn, fax[2] / fn];
-  const REP_MS = 1800, ROT_FRAC = 0.3;
+  const REP_MS = 1800;
   const t0 = performance.now();
   const el = $('plot-poly');
   const scratch = new Float32Array(t.NI * 3);
@@ -255,10 +255,9 @@ function startPolyAnim() {
     const axis: [number, number, number] = fixed
       ? fax
       : [t.reprot[3 * rep], t.reprot[3 * rep + 1], t.reprot[3 * rep + 2]];
-    // phase 1: rotate into this rep's orientation; phase 2: radial growth
-    const ang = ph < ROT_FRAC ? rotAngle * (ph / ROT_FRAC) : rotAngle;
-    const gp = ph < ROT_FRAC ? 0 : (ph - ROT_FRAC) / (1 - ROT_FRAC);
-    const scale = Math.max(prof[Math.min(t.NPTS - 1, Math.floor(gp * (t.NPTS - 1)))], 0.06);
+    // rotation and radial growth together across the repetition
+    const ang = rotAngle * ph;
+    const scale = Math.max(prof[Math.min(t.NPTS - 1, Math.floor(ph * (t.NPTS - 1)))], 0.06);
     for (let j = 0; j < t.NI; j++) {
       const v = rodrigues([t.basis[3 * j], t.basis[3 * j + 1], t.basis[3 * j + 2]], axis, ang);
       scratch[3 * j] = v[0] * scale; scratch[3 * j + 1] = v[1] * scale; scratch[3 * j + 2] = v[2] * scale;
