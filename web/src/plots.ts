@@ -163,8 +163,11 @@ export function plotPoints3D(el: HTMLElement, t: TrajData, ilvs: number[], mode:
   return stride > 1 ? `showing every ${stride}ᵗʰ sample (${x.length.toLocaleString()} of ${totalPts.toLocaleString()} points)` : null;
 }
 
-/** 2D plane projections (points), xy / xz / yz side by side. */
-export function plotProjections(el: HTMLElement, t: TrajData, ilvs: number[], mode: ColorMode): string | null {
+/** 2D plane projections (points), xy / xz / yz side by side.
+ *  upTo (samples, 1..NPTS) plots only the first part of every interleave —
+ *  used by the readout animation. Axis ranges pinned to the full k extent. */
+export function plotProjections(el: HTMLElement, t: TrajData, ilvs: number[], mode: ColorMode,
+                                upTo?: number): string | null {
   const budget = HAS_WEBGL ? 120_000 : 24_000;
   const totalPts = ilvs.length * t.NPTS;
   const stride = Math.max(1, Math.ceil(totalPts / budget));
@@ -175,7 +178,7 @@ export function plotProjections(el: HTMLElement, t: TrajData, ilvs: number[], mo
     const base = irep * t.NI * t.NPTS + j * t.NPTS;
     const c = colorOf(mode, g, t.NI, t.NREPS);
     vmax = c.vmax;
-    for (let p = 0; p < t.NPTS; p += stride) {
+    for (let p = 0; p < (upTo ?? t.NPTS); p += stride) {
       ax.push(t.kx[base + p]); ay.push(t.ky[base + p]); az.push(t.kz[base + p]); cv.push(c.v);
     }
   }
@@ -187,14 +190,25 @@ export function plotProjections(el: HTMLElement, t: TrajData, ilvs: number[], mo
     name, hoverinfo: 'skip', showlegend: false,
   } as PlotlyData));
   const axc = { ...AXIS, scaleanchor: undefined };
-  Plotly.react(el, traces, {
+  const lay: Record<string, unknown> = {
     ...DARK, grid: { rows: 1, columns: 3, pattern: 'independent' },
     margin: { l: 45, r: 10, t: 40, b: 40 },
     title: { text: 'plane projections (sample points)', font: { size: 13 } },
     xaxis: { ...axc, title: { text: 'kx' } }, yaxis: { ...axc, title: { text: 'ky' }, scaleanchor: 'x' },
     xaxis2: { ...axc, title: { text: 'kx' } }, yaxis2: { ...axc, title: { text: 'kz' }, scaleanchor: 'x2' },
     xaxis3: { ...axc, title: { text: 'ky' } }, yaxis3: { ...axc, title: { text: 'kz' }, scaleanchor: 'x3' },
-  } as PlotlyLayout, { responsive: true });
+  };
+  if (upTo !== undefined) {
+    // animation frame: pin all axes to the full k extent (|k| <= kmax)
+    let km = 1e-9;
+    for (let p = 0; p < t.NPTS; p++)
+      km = Math.max(km, Math.hypot(t.kx[p], t.ky[p], t.kz[p]));
+    const range = [-1.05 * km, 1.05 * km];
+    for (const a of ['xaxis', 'yaxis', 'xaxis2', 'yaxis2', 'xaxis3', 'yaxis3'])
+      lay[a] = { ...(lay[a] as object), range, autorange: false };
+    lay.uirevision = 'proj-anim';
+  }
+  Plotly.react(el, traces, lay as PlotlyLayout, { responsive: true });
   return stride > 1 ? `showing every ${stride}ᵗʰ sample` : null;
 }
 

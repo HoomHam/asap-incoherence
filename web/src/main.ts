@@ -102,7 +102,8 @@ let activeView = 'poly';
 for (const btn of $('tabs').querySelectorAll('button')) {
   btn.addEventListener('click', () => {
     if (activeView === 'poly' && btn.dataset.view !== 'poly') stopPolyAnim();
-    if (activeView === 'curves' && btn.dataset.view !== 'curves') { stopCurveAnim(); rendered.delete('curves'); }
+    if (activeView === 'curves' && btn.dataset.view !== 'curves' && curveAnim.running()) { curveAnim.stop(); rendered.delete('curves'); }
+    if (activeView === 'proj' && btn.dataset.view !== 'proj' && projAnim.running()) { projAnim.stop(); rendered.delete('proj'); }
     activeView = btn.dataset.view!;
     for (const b of $('tabs').querySelectorAll('button')) b.classList.toggle('active', b === btn);
     for (const v of VIEWS) $(`view-${v}`).classList.toggle('active', v === activeView);
@@ -154,7 +155,8 @@ function invalidateViews(alsoP = false) {
 }
 
 function updateViews() {
-  stopCurveAnim();
+  curveAnim.stop();
+  projAnim.stop();
   invalidateViews();
   renderActive();
 }
@@ -170,8 +172,12 @@ $('poly-animate').addEventListener('click', () => {
   else startPolyAnim();
 });
 $('curves-animate').addEventListener('click', () => {
-  if (curveAnimId !== null) { stopCurveAnim(); rendered.delete('curves'); renderActive(); }
-  else startCurveAnim();
+  if (curveAnim.running()) { curveAnim.stop(); rendered.delete('curves'); renderActive(); }
+  else curveAnim.start();
+});
+$('proj-animate').addEventListener('click', () => {
+  if (projAnim.running()) { projAnim.stop(); rendered.delete('proj'); renderActive(); }
+  else projAnim.start();
 });
 for (const id of ['fountain-field', 'fountain-plane'])
   $(id).addEventListener('change', () => { rendered.delete('fountain'); renderActive(); });
@@ -206,44 +212,50 @@ function minPairAngleDeg(pts: Float32Array, count: number): number {
   return (Math.acos(Math.min(1, Math.max(-1, maxDot))) * 180) / Math.PI;
 }
 
-// --- 3D-curves readout animation: draw every selected interleave sample by
-// sample, k-space center -> kmax, over one (scaled) readout duration.
-let curveAnimId: number | null = null;
-
-function stopCurveAnim() {
-  if (curveAnimId !== null) { cancelAnimationFrame(curveAnimId); curveAnimId = null; }
-  $('curves-animate').textContent = '▶ draw readout';
-  $('curves-frame').textContent = '';
-}
-
-function startCurveAnim() {
-  if (!traj) return;
-  if (!plots.HAS_WEBGL) { setStatus('animation needs WebGL (hardware acceleration)', 'error'); return; }
-  const t = traj;
-  const ilvs = currentEnsemble();
-  const mode = colorMode();
-  // one readout, same at-proportional time base as the sequence animation
-  const DUR_MS = Math.min(20000, Math.max(1000, 6000 * lastParams.at / V3_DEFAULTS.at));
-  const t0 = performance.now();
-  const el = $('plot-curves');
-  const step = () => {
-    const ph = Math.min(1, (performance.now() - t0) / DUR_MS);
-    const upTo = Math.max(2, Math.ceil(ph * t.NPTS));
-    const note = plots.plotCurves3D(el, t, ilvs, mode, upTo);
-    $('curves-frame').textContent =
-      `t ${(ph * lastParams.at * 1e3).toFixed(2)} ms · sample ${upTo}/${t.NPTS}`;
-    if (ph >= 1) {
-      stopCurveAnim();
-      $('curves-frame').textContent = `done — full readout, ${t.NPTS} samples`;
-      $('note-curves').textContent = note ?? '';
-      rendered.add('curves');
-      return;
-    }
-    curveAnimId = requestAnimationFrame(step);
+// --- readout animations (3D curves + projections): draw every selected
+// interleave sample by sample, k-space center -> kmax, over one (scaled)
+// readout duration.
+function makeReadoutAnim(btnId: string, frameId: string, noteId: string, viewKey: string,
+                         needsWebgl: boolean,
+                         render: (upTo: number) => string | null) {
+  let id: number | null = null;
+  const stop = () => {
+    if (id !== null) { cancelAnimationFrame(id); id = null; }
+    $(btnId).textContent = '▶ draw readout';
+    $(frameId).textContent = '';
   };
-  $('curves-animate').textContent = '⏸ stop';
-  curveAnimId = requestAnimationFrame(step);
+  const start = () => {
+    if (!traj) return;
+    if (needsWebgl && !plots.HAS_WEBGL) { setStatus('animation needs WebGL (hardware acceleration)', 'error'); return; }
+    const t = traj;
+    // one readout, same at-proportional time base as the sequence animation
+    const DUR_MS = Math.min(20000, Math.max(1000, 6000 * lastParams.at / V3_DEFAULTS.at));
+    const t0 = performance.now();
+    const step = () => {
+      const ph = Math.min(1, (performance.now() - t0) / DUR_MS);
+      const upTo = Math.max(2, Math.ceil(ph * t.NPTS));
+      const note = render(upTo);
+      $(frameId).textContent =
+        `t ${(ph * lastParams.at * 1e3).toFixed(2)} ms · sample ${upTo}/${t.NPTS}`;
+      if (ph >= 1) {
+        stop();
+        $(frameId).textContent = `done — full readout, ${t.NPTS} samples`;
+        $(noteId).textContent = note ?? '';
+        rendered.add(viewKey);
+        return;
+      }
+      id = requestAnimationFrame(step);
+    };
+    $(btnId).textContent = '⏸ stop';
+    id = requestAnimationFrame(step);
+  };
+  return { stop, start, running: () => id !== null };
 }
+
+const curveAnim = makeReadoutAnim('curves-animate', 'curves-frame', 'note-curves', 'curves', true,
+  (upTo) => plots.plotCurves3D($('plot-curves'), traj!, currentEnsemble(), colorMode(), upTo));
+const projAnim = makeReadoutAnim('proj-animate', 'proj-frame', 'note-proj', 'proj', false,
+  (upTo) => plots.plotProjections($('plot-proj'), traj!, currentEnsemble(), colorMode(), upTo));
 
 // --- polyhedron sequence animation: replay the actual k(t) samples rep by
 // rep — orientation snaps between reps (cumulative, as kasap applies it)
