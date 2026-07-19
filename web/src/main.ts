@@ -244,7 +244,9 @@ function startPolyAnim() {
   let fax: [number, number, number] = [...lastParams.axis] as [number, number, number];
   const fn = Math.hypot(...fax) || 1;
   fax = [fax[0] / fn, fax[1] / fn, fax[2] / fn];
-  const REP_MS = 6000;                    // slow: see the action
+  // 6 s per rep at the v3 default readout (5.12 ms); other readouts scale
+  // proportionally so relative durations are visible. Clamped to stay watchable.
+  const REP_MS = Math.min(20000, Math.max(1000, 6000 * lastParams.at / V3_DEFAULTS.at));
   const TRAIL = 18;                       // very short window: trail dies fast
   const t0 = performance.now();
   const el = $('plot-poly');
