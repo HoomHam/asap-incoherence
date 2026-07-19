@@ -321,15 +321,15 @@ export function plotPolyhedron(el: HTMLElement, pts: Float32Array, count: number
       const L = tr.x.length;
       for (let k = 0; k < L; k++) {
         const age = L > 1 ? k / (L - 1) : 1;          // 0 oldest, 1 newest
-        const fade = age * age;                        // steep: tail dies fast
+        const fade = age * age * age;                  // very steep: tail dies fast
         tx.push(tr.x[k]); ty.push(tr.y[k]); tz.push(tr.z[k]);
-        tc.push(`rgba(${rgb},${(0.85 * fade).toFixed(3)})`);
-        tsz.push(1 + 3 * fade);
+        tc.push(`rgba(${rgb},${(0.5 * fade).toFixed(3)})`);
+        tsz.push(0.8 + 1.4 * fade);
       }
     });
     trailTraces = [{
       type: 'scatter3d', mode: 'markers', x: tx, y: ty, z: tz,
-      marker: { color: tc, size: tsz },
+      marker: { color: tc, size: tsz, symbol: 'circle-open' },
       hoverinfo: 'skip', showlegend: false,
     } as PlotlyData];
   }
