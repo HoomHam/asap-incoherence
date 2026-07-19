@@ -321,9 +321,10 @@ export function plotPolyhedron(el: HTMLElement, pts: Float32Array, count: number
       const L = tr.x.length;
       for (let k = 0; k < L; k++) {
         const age = L > 1 ? k / (L - 1) : 1;          // 0 oldest, 1 newest
+        const fade = age * age;                        // steep: tail dies fast
         tx.push(tr.x[k]); ty.push(tr.y[k]); tz.push(tr.z[k]);
-        tc.push(`rgba(${rgb},${(0.05 + 0.75 * age).toFixed(3)})`);
-        tsz.push(1.5 + 2.5 * age);
+        tc.push(`rgba(${rgb},${(0.85 * fade).toFixed(3)})`);
+        tsz.push(1 + 3 * fade);
       }
     });
     trailTraces = [{

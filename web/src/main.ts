@@ -245,7 +245,7 @@ function startPolyAnim() {
   const fn = Math.hypot(...fax) || 1;
   fax = [fax[0] / fn, fax[1] / fn, fax[2] / fn];
   const REP_MS = 3600;                    // slow: see the action
-  const TRAIL = 140;                      // drift history per spoke (frames)
+  const TRAIL = 45;                       // short window: trail dies quickly
   const t0 = performance.now();
   const el = $('plot-poly');
   const scratch = new Float32Array(t.NI * 3);
