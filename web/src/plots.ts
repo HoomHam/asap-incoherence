@@ -310,19 +310,28 @@ export function plotPolyhedron(el: HTMLElement, pts: Float32Array, count: number
     x.push(pts[3 * i]); y.push(pts[3 * i + 1]); z.push(pts[3 * i + 2]);
     txt.push(`${i}`);
   }
-  const trailTraces: PlotlyData[] = (trails ?? []).map((tr, i) => {
-    // jet-trail fade: oldest points sink into the background, newest full color
-    const ramp = tr.x.map((_, k) => k / Math.max(tr.x.length - 1, 1));
-    return {
-      type: 'scatter3d', mode: 'lines', x: tr.x, y: tr.y, z: tr.z,
-      line: {
-        color: ramp, cmin: 0, cmax: 1, width: 3,
-        colorscale: [[0, '#14161c'], [1, turbo(i / Math.max(count - 1, 1))]],
-        showscale: false,
-      },
+  // jet trail: one combined marker cloud, per-point rgba alpha by age
+  // (markers, not lines: no connecting "return" segment at rep boundaries)
+  let trailTraces: PlotlyData[] = [];
+  if (trails && trails.length) {
+    const tx: number[] = [], ty: number[] = [], tz: number[] = [];
+    const tc: string[] = [], tsz: number[] = [];
+    trails.forEach((tr, i) => {
+      const rgb = turbo(i / Math.max(count - 1, 1)).slice(4, -1); // "r,g,b"
+      const L = tr.x.length;
+      for (let k = 0; k < L; k++) {
+        const age = L > 1 ? k / (L - 1) : 1;          // 0 oldest, 1 newest
+        tx.push(tr.x[k]); ty.push(tr.y[k]); tz.push(tr.z[k]);
+        tc.push(`rgba(${rgb},${(0.05 + 0.75 * age).toFixed(3)})`);
+        tsz.push(1.5 + 2.5 * age);
+      }
+    });
+    trailTraces = [{
+      type: 'scatter3d', mode: 'markers', x: tx, y: ty, z: tz,
+      marker: { color: tc, size: tsz },
       hoverinfo: 'skip', showlegend: false,
-    } as PlotlyData;
-  });
+    } as PlotlyData];
+  }
   const traces: PlotlyData[] = [
     ...trailTraces,
     {
