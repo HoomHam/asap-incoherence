@@ -245,9 +245,13 @@ function startPolyAnim() {
   const fn = Math.hypot(...fax) || 1;
   fax = [fax[0] / fn, fax[1] / fn, fax[2] / fn];
   const REP_MS = 1800;
+  const TRAIL = 90;                       // ~1.5 s of drift history per spoke
   const t0 = performance.now();
   const el = $('plot-poly');
   const scratch = new Float32Array(t.NI * 3);
+  const trails = Array.from({ length: t.NI }, () => ({
+    x: [] as number[], y: [] as number[], z: [] as number[],
+  }));
   const step = () => {
     const el0 = performance.now() - t0;
     const rep = Math.floor(el0 / REP_MS) % t.NREPS;
@@ -261,9 +265,12 @@ function startPolyAnim() {
     for (let j = 0; j < t.NI; j++) {
       const v = rodrigues([t.basis[3 * j], t.basis[3 * j + 1], t.basis[3 * j + 2]], axis, ang);
       scratch[3 * j] = v[0] * scale; scratch[3 * j + 1] = v[1] * scale; scratch[3 * j + 2] = v[2] * scale;
+      const tr = trails[j];
+      tr.x.push(v[0] * scale); tr.y.push(v[1] * scale); tr.z.push(v[2] * scale);
+      if (tr.x.length > TRAIL) { tr.x.shift(); tr.y.shift(); tr.z.shift(); }
     }
     plots.plotPolyhedron(el, scratch, t.NI,
-      `sequence animation — rep ${rep + 1}/${t.NREPS}`);
+      `sequence animation — rep ${rep + 1}/${t.NREPS}`, trails);
     $('poly-frame').textContent =
       `rep ${rep + 1}/${t.NREPS} · rot ${((ang * 180) / Math.PI).toFixed(0)}° · r/kmax ${scale.toFixed(2)}`;
     polyAnimId = requestAnimationFrame(step);

@@ -299,16 +299,24 @@ export function plotFans(el: HTMLElement, r: PsfResult): void {
   Plotly.react(el, traces, lay as PlotlyLayout, { responsive: true });
 }
 
-/** Convex polyhedron of unit vectors: translucent hull (alphahull=0) + vertices. */
+/** Convex polyhedron of unit vectors: translucent hull (alphahull=0) + vertices.
+ *  Optional trails: per-vertex drift history drawn as fading lines. */
 export function plotPolyhedron(el: HTMLElement, pts: Float32Array, count: number,
-                               title: string): void {
+                               title: string,
+                               trails?: { x: number[]; y: number[]; z: number[] }[]): void {
   if (!HAS_WEBGL) { webglNotice(el, 'polyhedron'); return; }
   const x: number[] = [], y: number[] = [], z: number[] = [], txt: string[] = [];
   for (let i = 0; i < count; i++) {
     x.push(pts[3 * i]); y.push(pts[3 * i + 1]); z.push(pts[3 * i + 2]);
     txt.push(`${i}`);
   }
+  const trailTraces: PlotlyData[] = (trails ?? []).map((tr, i) => ({
+    type: 'scatter3d', mode: 'lines', x: tr.x, y: tr.y, z: tr.z,
+    line: { color: turbo(i / Math.max(count - 1, 1)), width: 2.5 },
+    opacity: 0.45, hoverinfo: 'skip', showlegend: false,
+  } as PlotlyData));
   const traces: PlotlyData[] = [
+    ...trailTraces,
     {
       type: 'mesh3d', x, y, z, alphahull: 0,
       color: '#5b8fd9', opacity: 0.35, flatshading: true,
