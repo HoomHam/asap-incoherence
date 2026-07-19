@@ -97,8 +97,8 @@ function currentEnsemble(): number[] {
 
 // ---------------------------------------------------------------- views
 
-const VIEWS = ['curves', 'points', 'proj', 'psf', 'fan', 'fountain', 'poly', 'compare', 'about'];
-let activeView = 'curves';
+const VIEWS = ['curves', 'proj', 'psf', 'fan', 'fountain', 'poly', 'compare', 'about'];
+let activeView = 'poly';
 for (const btn of $('tabs').querySelectorAll('button')) {
   btn.addEventListener('click', () => {
     activeView = btn.dataset.view!;
@@ -118,10 +118,6 @@ function renderActive() {
       const note = plots.plotCurves3D($('plot-curves'), traj, ilvs, colorMode());
       $('note-curves').textContent = note ?? '';
       rendered.add('curves');
-    } else if (activeView === 'points' && !rendered.has('points')) {
-      const note = plots.plotPoints3D($('plot-points'), traj, ilvs, colorMode());
-      $('note-points').textContent = note ?? '';
-      rendered.add('points');
     } else if (activeView === 'proj' && !rendered.has('proj')) {
       const note = plots.plotProjections($('plot-proj'), traj, ilvs, colorMode());
       $('note-proj').textContent = note ?? '';
@@ -150,7 +146,7 @@ function renderActive() {
 }
 
 function invalidateViews(alsoP = false) {
-  rendered.delete('curves'); rendered.delete('points'); rendered.delete('proj');
+  rendered.delete('curves'); rendered.delete('proj');
   rendered.delete('poly');
   if (alsoP) { rendered.delete('psf'); rendered.delete('fan'); }
 }
