@@ -325,9 +325,14 @@ export function plotPolyhedron(el: HTMLElement, pts: Float32Array, count: number
   ];
   const bare = { ...AXIS, backgroundcolor: '#14161c', showbackground: true,
                  title: { text: '' }, showticklabels: false };
+  const range = [-1.05, 1.05];
   Plotly.react(el, traces, {
     ...layout3d(title),
-    scene: { xaxis: bare, yaxis: bare, zaxis: bare, aspectmode: 'data' },
+    uirevision: 'poly',
+    scene: {
+      xaxis: { ...bare, range }, yaxis: { ...bare, range }, zaxis: { ...bare, range },
+      aspectmode: 'cube',
+    },
   } as PlotlyLayout, { responsive: true });
 }
 

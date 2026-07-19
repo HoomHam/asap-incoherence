@@ -101,6 +101,7 @@ const VIEWS = ['curves', 'proj', 'psf', 'fan', 'fountain', 'poly', 'compare', 'a
 let activeView = 'poly';
 for (const btn of $('tabs').querySelectorAll('button')) {
   btn.addEventListener('click', () => {
+    if (activeView === 'poly' && btn.dataset.view !== 'poly') stopPolyAnim();
     activeView = btn.dataset.view!;
     for (const b of $('tabs').querySelectorAll('button')) b.classList.toggle('active', b === btn);
     for (const v of VIEWS) $(`view-${v}`).classList.toggle('active', v === activeView);
@@ -158,7 +159,14 @@ function updateViews() {
 
 $('btn-view').addEventListener('click', updateViews);
 $('color-mode').addEventListener('change', updateViews);
-$('poly-which').addEventListener('change', () => { rendered.delete('poly'); renderActive(); });
+$('poly-which').addEventListener('change', () => {
+  ($('poly-animate') as HTMLButtonElement).disabled = ($('poly-which') as HTMLSelectElement).value !== 'basis';
+  rendered.delete('poly'); renderActive();
+});
+$('poly-animate').addEventListener('click', () => {
+  if (polyAnimId !== null) { stopPolyAnim(); rendered.delete('poly'); renderActive(); }
+  else startPolyAnim();
+});
 for (const id of ['fountain-field', 'fountain-plane'])
   $(id).addEventListener('change', () => { rendered.delete('fountain'); renderActive(); });
 $('ens-expr').addEventListener('keydown', (e) => { if ((e as KeyboardEvent).key === 'Enter') updateViews(); });
@@ -192,8 +200,82 @@ function minPairAngleDeg(pts: Float32Array, count: number): number {
   return (Math.acos(Math.min(1, Math.max(-1, maxDot))) * 180) / Math.PI;
 }
 
+// --- polyhedron sequence animation: per rep, rotate by the rep angle about
+// that rep's axis, then grow radially along the ACTUAL r(t)/kmax law.
+let polyAnimId: number | null = null;
+
+function rodrigues(v: [number, number, number], u: [number, number, number], th: number): [number, number, number] {
+  const c = Math.cos(th), s = Math.sin(th), cm = 1 - c;
+  const [x, y, z] = v, [ux, uy, uz] = u;
+  const d = ux * x + uy * y + uz * z;
+  return [
+    x * c + (uy * z - uz * y) * s + ux * d * cm,
+    y * c + (uz * x - ux * z) * s + uy * d * cm,
+    z * c + (ux * y - uy * x) * s + uz * d * cm,
+  ];
+}
+
+function radialProfile(): Float32Array {
+  // |k|(t)/kmax of interleave 0, rep 0 — magnitude law is shared by all ilvs
+  const t = traj!;
+  const prof = new Float32Array(t.NPTS);
+  let mx = 1e-9;
+  for (let p = 0; p < t.NPTS; p++) {
+    prof[p] = Math.hypot(t.kx[p], t.ky[p], t.kz[p]);
+    if (prof[p] > mx) mx = prof[p];
+  }
+  for (let p = 0; p < t.NPTS; p++) prof[p] /= mx;
+  return prof;
+}
+
+function stopPolyAnim() {
+  if (polyAnimId !== null) { cancelAnimationFrame(polyAnimId); polyAnimId = null; }
+  $('poly-animate').textContent = '▶ animate sequence';
+  $('poly-frame').textContent = '';
+}
+
+function startPolyAnim() {
+  if (!traj) return;
+  if (!plots.HAS_WEBGL) { setStatus('animation needs WebGL (hardware acceleration)', 'error'); return; }
+  const t = traj;
+  const prof = radialProfile();
+  const rotAngle = (lastParams.rotAngleDeg * Math.PI) / 180;
+  const fixed = lastParams.axisMode === 'fixed';
+  let fax: [number, number, number] = [...lastParams.axis] as [number, number, number];
+  const fn = Math.hypot(...fax) || 1;
+  fax = [fax[0] / fn, fax[1] / fn, fax[2] / fn];
+  const REP_MS = 1800, ROT_FRAC = 0.3;
+  const t0 = performance.now();
+  const el = $('plot-poly');
+  const scratch = new Float32Array(t.NI * 3);
+  const step = () => {
+    const el0 = performance.now() - t0;
+    const rep = Math.floor(el0 / REP_MS) % t.NREPS;
+    const ph = (el0 % REP_MS) / REP_MS;
+    const axis: [number, number, number] = fixed
+      ? fax
+      : [t.reprot[3 * rep], t.reprot[3 * rep + 1], t.reprot[3 * rep + 2]];
+    // phase 1: rotate into this rep's orientation; phase 2: radial growth
+    const ang = ph < ROT_FRAC ? rotAngle * (ph / ROT_FRAC) : rotAngle;
+    const gp = ph < ROT_FRAC ? 0 : (ph - ROT_FRAC) / (1 - ROT_FRAC);
+    const scale = Math.max(prof[Math.min(t.NPTS - 1, Math.floor(gp * (t.NPTS - 1)))], 0.06);
+    for (let j = 0; j < t.NI; j++) {
+      const v = rodrigues([t.basis[3 * j], t.basis[3 * j + 1], t.basis[3 * j + 2]], axis, ang);
+      scratch[3 * j] = v[0] * scale; scratch[3 * j + 1] = v[1] * scale; scratch[3 * j + 2] = v[2] * scale;
+    }
+    plots.plotPolyhedron(el, scratch, t.NI,
+      `sequence animation — rep ${rep + 1}/${t.NREPS}`);
+    $('poly-frame').textContent =
+      `rep ${rep + 1}/${t.NREPS} · rot ${((ang * 180) / Math.PI).toFixed(0)}° · r/kmax ${scale.toFixed(2)}`;
+    polyAnimId = requestAnimationFrame(step);
+  };
+  $('poly-animate').textContent = '⏸ stop';
+  polyAnimId = requestAnimationFrame(step);
+}
+
 function renderPolyhedron() {
   if (!traj) return;
+  stopPolyAnim();
   const which = ($('poly-which') as HTMLSelectElement).value;
   const pts = which === 'basis' ? traj.basis : traj.reprot;
   const count = which === 'basis' ? traj.NI : traj.NREPS;
