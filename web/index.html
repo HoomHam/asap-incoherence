@@ -145,7 +145,14 @@
         <div id="status">loading WASM…</div>
       </div>
       <div id="content">
-        <div class="view" id="view-curves"><div class="note" id="note-curves"></div><div class="plot tall" id="plot-curves"></div></div>
+        <div class="view" id="view-curves">
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:8px">
+            <button id="curves-animate" style="flex-shrink:0" title="draw every selected interleave sample by sample, from k-space center to kmax, in readout time">▶ draw readout</button>
+            <span class="note" id="curves-frame" style="margin:0"></span>
+            <span class="note" id="note-curves" style="margin:0"></span>
+          </div>
+          <div class="plot tall" id="plot-curves"></div>
+        </div>
         <div class="view" id="view-proj"><div class="note" id="note-proj"></div><div class="plot" id="plot-proj"></div></div>
         <div class="view" id="view-psf">
           <div class="plot" id="plot-slices"></div>

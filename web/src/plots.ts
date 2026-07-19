@@ -66,11 +66,12 @@ function strideFor(nPts: number, target: number): number {
   return Math.max(1, Math.floor(nPts / target));
 }
 
-function ilvSamples(t: TrajData, g: number, stride: number): { x: number[]; y: number[]; z: number[] } {
+function ilvSamples(t: TrajData, g: number, stride: number,
+                    upTo: number = t.NPTS): { x: number[]; y: number[]; z: number[] } {
   const irep = Math.floor(g / t.NI), j = g % t.NI;
   const base = irep * t.NI * t.NPTS + j * t.NPTS;
   const x: number[] = [], y: number[] = [], z: number[] = [];
-  for (let p = 0; p < t.NPTS; p += stride) {
+  for (let p = 0; p < upTo; p += stride) {
     x.push(t.kx[base + p]); y.push(t.ky[base + p]); z.push(t.kz[base + p]);
   }
   return { x, y, z };
@@ -89,8 +90,11 @@ function turbo(t: number): string {
   return `rgb(${c[0]},${c[1]},${c[2]})`;
 }
 
-/** 3D curves, one line per interleave, turbo by index. Caps at 256 curves. */
-export function plotCurves3D(el: HTMLElement, t: TrajData, ilvs: number[], mode: ColorMode): string | null {
+/** 3D curves, one line per interleave, turbo by index. Caps at 256 curves.
+ *  upTo (samples, 1..NPTS) draws only the first part of every curve —
+ *  used by the readout animation. Axis ranges stay fixed to the full extent. */
+export function plotCurves3D(el: HTMLElement, t: TrajData, ilvs: number[], mode: ColorMode,
+                             upTo?: number): string | null {
   if (!HAS_WEBGL) { webglNotice(el, '3D curves'); return null; }
   let note: string | null = null;
   let shown = ilvs;
@@ -101,7 +105,7 @@ export function plotCurves3D(el: HTMLElement, t: TrajData, ilvs: number[], mode:
   }
   const ptStride = strideFor(t.NPTS, 160);
   const traces = shown.map(g => {
-    const s = ilvSamples(t, g, ptStride);
+    const s = ilvSamples(t, g, ptStride, upTo ?? t.NPTS);
     const c = colorOf(mode, g, t.NI, t.NREPS);
     return {
       type: 'scatter3d', mode: 'lines', ...s,
@@ -110,7 +114,22 @@ export function plotCurves3D(el: HTMLElement, t: TrajData, ilvs: number[], mode:
     } as PlotlyData;
   });
   const lbl = colorOf(mode, 0, t.NI, t.NREPS).label;
-  Plotly.react(el, traces, layout3d(`3D interleave curves (physical k, cycles/m — turbo = ${lbl})`), { responsive: true });
+  const lay = layout3d(`3D interleave curves (physical k, cycles/m — turbo = ${lbl})`);
+  if (upTo !== undefined) {
+    // animation frame: pin axes to the full k extent so the view doesn't
+    // rescale as the curves grow (|k| <= kmax, shared by all ilvs)
+    let km = 1e-9;
+    for (let p = 0; p < t.NPTS; p++)
+      km = Math.max(km, Math.hypot(t.kx[p], t.ky[p], t.kz[p]));
+    const range = [-1.05 * km, 1.05 * km];
+    const sc = (lay as { scene: Record<string, unknown> }).scene;
+    sc.xaxis = { ...(sc.xaxis as object), range, autorange: false };
+    sc.yaxis = { ...(sc.yaxis as object), range, autorange: false };
+    sc.zaxis = { ...(sc.zaxis as object), range, autorange: false };
+    sc.aspectmode = 'cube';
+    (lay as Record<string, unknown>).uirevision = 'curves-anim';
+  }
+  Plotly.react(el, traces, lay, { responsive: true });
   return note;
 }
 

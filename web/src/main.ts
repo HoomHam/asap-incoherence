@@ -102,6 +102,7 @@ let activeView = 'poly';
 for (const btn of $('tabs').querySelectorAll('button')) {
   btn.addEventListener('click', () => {
     if (activeView === 'poly' && btn.dataset.view !== 'poly') stopPolyAnim();
+    if (activeView === 'curves' && btn.dataset.view !== 'curves') { stopCurveAnim(); rendered.delete('curves'); }
     activeView = btn.dataset.view!;
     for (const b of $('tabs').querySelectorAll('button')) b.classList.toggle('active', b === btn);
     for (const v of VIEWS) $(`view-${v}`).classList.toggle('active', v === activeView);
@@ -153,6 +154,7 @@ function invalidateViews(alsoP = false) {
 }
 
 function updateViews() {
+  stopCurveAnim();
   invalidateViews();
   renderActive();
 }
@@ -166,6 +168,10 @@ $('poly-which').addEventListener('change', () => {
 $('poly-animate').addEventListener('click', () => {
   if (polyAnimId !== null) { stopPolyAnim(); rendered.delete('poly'); renderActive(); }
   else startPolyAnim();
+});
+$('curves-animate').addEventListener('click', () => {
+  if (curveAnimId !== null) { stopCurveAnim(); rendered.delete('curves'); renderActive(); }
+  else startCurveAnim();
 });
 for (const id of ['fountain-field', 'fountain-plane'])
   $(id).addEventListener('change', () => { rendered.delete('fountain'); renderActive(); });
@@ -198,6 +204,45 @@ function minPairAngleDeg(pts: Float32Array, count: number): number {
       if (d > maxDot) maxDot = d;
     }
   return (Math.acos(Math.min(1, Math.max(-1, maxDot))) * 180) / Math.PI;
+}
+
+// --- 3D-curves readout animation: draw every selected interleave sample by
+// sample, k-space center -> kmax, over one (scaled) readout duration.
+let curveAnimId: number | null = null;
+
+function stopCurveAnim() {
+  if (curveAnimId !== null) { cancelAnimationFrame(curveAnimId); curveAnimId = null; }
+  $('curves-animate').textContent = '▶ draw readout';
+  $('curves-frame').textContent = '';
+}
+
+function startCurveAnim() {
+  if (!traj) return;
+  if (!plots.HAS_WEBGL) { setStatus('animation needs WebGL (hardware acceleration)', 'error'); return; }
+  const t = traj;
+  const ilvs = currentEnsemble();
+  const mode = colorMode();
+  // one readout, same at-proportional time base as the sequence animation
+  const DUR_MS = Math.min(20000, Math.max(1000, 6000 * lastParams.at / V3_DEFAULTS.at));
+  const t0 = performance.now();
+  const el = $('plot-curves');
+  const step = () => {
+    const ph = Math.min(1, (performance.now() - t0) / DUR_MS);
+    const upTo = Math.max(2, Math.ceil(ph * t.NPTS));
+    const note = plots.plotCurves3D(el, t, ilvs, mode, upTo);
+    $('curves-frame').textContent =
+      `t ${(ph * lastParams.at * 1e3).toFixed(2)} ms · sample ${upTo}/${t.NPTS}`;
+    if (ph >= 1) {
+      stopCurveAnim();
+      $('curves-frame').textContent = `done — full readout, ${t.NPTS} samples`;
+      $('note-curves').textContent = note ?? '';
+      rendered.add('curves');
+      return;
+    }
+    curveAnimId = requestAnimationFrame(step);
+  };
+  $('curves-animate').textContent = '⏸ stop';
+  curveAnimId = requestAnimationFrame(step);
 }
 
 // --- polyhedron sequence animation: replay the actual k(t) samples rep by
