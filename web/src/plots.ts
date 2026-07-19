@@ -323,7 +323,12 @@ export function plotPolyhedron(el: HTMLElement, pts: Float32Array, count: number
       hoverinfo: 'text', name: 'charges',
     } as PlotlyData,
   ];
-  Plotly.react(el, traces, layout3d(title), { responsive: true });
+  const bare = { ...AXIS, backgroundcolor: '#14161c', showbackground: true,
+                 title: { text: '' }, showticklabels: false };
+  Plotly.react(el, traces, {
+    ...layout3d(title),
+    scene: { xaxis: bare, yaxis: bare, zaxis: bare, aspectmode: 'data' },
+  } as PlotlyLayout, { responsive: true });
 }
 
 /** PSF fountain: one 3D curve per ray angle (360 rays, 1 deg step), 512 samples
