@@ -3,6 +3,7 @@
 import type { GenParams, TrajData, PsfResult, WorkerResponse, GoldenReport } from './types';
 import { V3_DEFAULTS } from './types';
 import { parseEnsemble, PRESETS } from './ensemble';
+import { shellDensity } from './metrics';
 import * as plots from './plots';
 import batteryPng from './assets/alias_psf_battery.png';
 import fanPng from './assets/psf_fan_view.png';
@@ -113,6 +114,8 @@ for (const btn of $('tabs').querySelectorAll('button')) {
 
 const rendered = new Set<string>();
 
+const allIlvs = () => Array.from({ length: traj ? traj.NI * traj.NREPS : 0 }, (_, i) => i);
+
 function renderActive() {
   if (!traj) return;
   try {
@@ -122,8 +125,14 @@ function renderActive() {
       $('note-curves').textContent = note ?? '';
       rendered.add('curves');
     } else if (activeView === 'proj' && !rendered.has('proj')) {
-      const note = plots.plotProjections($('plot-proj'), traj, ilvs, colorMode());
-      $('note-proj').textContent = note ?? '';
+      const ensD = shellDensity(traj, ilvs);
+      const fullD = shellDensity(traj, allIlvs());
+      const note = plots.plotProjections($('plot-proj'), traj, ilvs, colorMode(),
+        undefined, { rEns: ensD.rN, rFull: fullD.rN });
+      $('note-proj').textContent =
+        `${note ? note + ' · ' : ''}r_N ${ensD.rN.toFixed(0)} (full ${fullD.rN.toFixed(0)}) of kmax ${ensD.kmaxGrid.toFixed(0)} grid units`;
+      plots.plotShellDensity($('plot-density'), ensD, fullD,
+        ($('ens-expr') as HTMLInputElement).value.trim() || 'all');
       rendered.add('proj');
     } else if (activeView === 'psf' && lastPsf && !rendered.has('psf')) {
       renderSlices();
@@ -394,13 +403,17 @@ function metricsTable(rs: PsfResult[]): string {
     ['alias peak r (vox)', r => fmt(r.aliasStats.peakR, 1)],
     ['alias peak direction', r => r.aliasStats.peakDir.map(v => fmt(v, 2)).join(', ')],
     ['dipole |⟨k̂⟩| (|k|>0.2 kmax)', r => fmt(r.dipole, 4)],
+    ['Nyquist radius r_N (grid units)', r => r.rN !== undefined ? `${fmt(r.rN, 0)} of kmax ${fmt(r.kmaxGrid!, 0)}` : '—'],
+    ['r_N full set', r => r.rNFull !== undefined ? fmt(r.rNFull, 0) : '—'],
   ];
   let h = '<table class="metrics"><tr><th>metric</th>' + rs.map((_, i) => `<th>#${i + 1}</th>`).join('') + '</tr>';
   for (const [name, get, headline] of rows)
     h += `<tr><td class="name">${name}</td>` +
          rs.map(r => `<td class="${headline ? 'headline' : ''}">${get(r)}</td>`).join('') + '</tr>';
   h += '</table><div class="note">max/noise-like = 1.0 → perfectly incoherent (noise-like) aliasing; ' +
-       'v3 aligned windows measure ≈ 1.5. σ is Rayleigh-correct: √(E|x|²/2) over r &gt; 2·FWHM.</div>';
+       'v3 aligned windows measure ≈ 1.5. σ is Rayleigh-correct: √(E|x|²/2) over r &gt; 2·FWHM. ' +
+       'r_N = radius where shell sample density drops below 1 per (1/FOV)³ cell — ' +
+       'Nyquist-complete inside, undersampled outside (see Projections tab for the density curve).</div>';
   return h;
 }
 
@@ -438,6 +451,10 @@ $('btn-psf').addEventListener('click', async () => {
   ($('btn-psf') as HTMLButtonElement).disabled = true;
   try {
     lastPsf = await request<PsfResult>('psf', { ilvs, n, label });
+    if (traj) {
+      const ensD = shellDensity(traj, ilvs), fullD = shellDensity(traj, allIlvs());
+      lastPsf.rN = ensD.rN; lastPsf.rNFull = fullD.rN; lastPsf.kmaxGrid = ensD.kmaxGrid;
+    }
     const slider = $('slice-idx') as HTMLInputElement;
     slider.max = `${lastPsf.n - 1}`;
     slider.value = `${lastPsf.n >> 1}`;

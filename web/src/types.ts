@@ -74,6 +74,10 @@ export interface PsfResult {
   fullRe: Float32Array;      // full-set PSF volume
   fullIm: Float32Array;
   label: string;
+  // local Nyquist radii (grid units), attached on the main thread after compute
+  rN?: number;
+  rNFull?: number;
+  kmaxGrid?: number;
 }
 
 export type WorkerRequest =

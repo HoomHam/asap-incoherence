@@ -1,7 +1,41 @@
 // Numerics ported from reference_py/_psf_incoherence.py and _psf_fan_view.py.
 // Volume layout: v[(x*n + y)*n + z], center c = n/2 (matches the C module).
 
-import type { ShellProfile, FieldStats } from './types';
+import type { ShellProfile, FieldStats, TrajData } from './types';
+
+export interface DensityProfile {
+  r: Float64Array;     // shell centers, grid units (1 unit = 1/FOV)
+  dens: Float64Array;  // samples per (1/FOV)^3 k-space cell
+  rN: number;          // local Nyquist radius: shells inside have dens >= 1
+  kmaxGrid: number;    // ms/2
+}
+
+/** Shell-histogram sample density of an ensemble, in grid units.
+    Nyquist-complete where >= 1 sample per unit-volume cell; rN is the first
+    radius (past the r<2 center pileup) where density falls below that. */
+export function shellDensity(t: TrajData, ilvs: number[]): DensityProfile {
+  const kmaxGrid = t.ms / 2;
+  const nb = Math.ceil(kmaxGrid) + 2;
+  const count = new Float64Array(nb);
+  for (const g of ilvs) {
+    const base = g * t.NPTS;  // lin = pt + (irep*NI + j)*NPTS
+    for (let p = 0; p < t.NPTS; p++) {
+      const x = t.kx[base + p], y = t.ky[base + p], z = t.kz[base + p];
+      if (Number.isNaN(x)) continue;
+      const b = Math.floor(Math.hypot(x, y, z) * t.fov);
+      if (b < nb) count[b]++;
+    }
+  }
+  const r = new Float64Array(nb), dens = new Float64Array(nb);
+  for (let b = 0; b < nb; b++) {
+    const rc = b + 0.5;
+    r[b] = rc;
+    dens[b] = count[b] / (4 * Math.PI * rc * rc);
+  }
+  let rN = kmaxGrid;
+  for (let b = 2; b < nb; b++) if (dens[b] < 1) { rN = b; break; }
+  return { r, dens, rN, kmaxGrid };
+}
 
 export function absVol(re: Float32Array, im: Float32Array): Float32Array {
   const out = new Float32Array(re.length);

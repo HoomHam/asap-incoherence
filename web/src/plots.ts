@@ -7,7 +7,7 @@ import Plotly from 'plotly.js-dist-min';
 type PlotlyData = Record<string, unknown>;
 type PlotlyLayout = Record<string, unknown>;
 import type { TrajData, PsfResult } from './types';
-import { absVol, fanView, trilinear } from './metrics';
+import { absVol, fanView, trilinear, type DensityProfile } from './metrics';
 
 const DARK = {
   paper_bgcolor: '#14161c',
@@ -167,7 +167,8 @@ export function plotPoints3D(el: HTMLElement, t: TrajData, ilvs: number[], mode:
  *  upTo (samples, 1..NPTS) plots only the first part of every interleave —
  *  used by the readout animation. Axis ranges pinned to the full k extent. */
 export function plotProjections(el: HTMLElement, t: TrajData, ilvs: number[], mode: ColorMode,
-                                upTo?: number): string | null {
+                                upTo?: number,
+                                nyq?: { rEns: number; rFull: number }): string | null {
   const budget = HAS_WEBGL ? 120_000 : 24_000;
   const totalPts = ilvs.length * t.NPTS;
   const stride = Math.max(1, Math.ceil(totalPts / budget));
@@ -189,6 +190,26 @@ export function plotProjections(el: HTMLElement, t: TrajData, ilvs: number[], mo
     marker: { size: 1.5, opacity: 0.4, color: cv, colorscale: TURBO_SCALE, cmin: 0, cmax: vmax },
     name, hoverinfo: 'skip', showlegend: false,
   } as PlotlyData));
+  if (nyq) {
+    // Nyquist-radius circles: inside = shell density >= 1 sample/(1/FOV)^3 cell
+    const circles: [number, string, string][] = [[nyq.rEns / t.fov, '#4fd1c5', 'r_N ensemble']];
+    if (Math.abs(nyq.rFull - nyq.rEns) > 1e-9)
+      circles.push([nyq.rFull / t.fov, '#8899aa', 'r_N full set']);
+    for (let i = 0; i < 3; i++)
+      for (const [rad, color, cname] of circles) {
+        const cx: number[] = [], cy: number[] = [];
+        for (let a = 0; a <= 96; a++) {
+          const th = (a / 96) * 2 * Math.PI;
+          cx.push(rad * Math.cos(th)); cy.push(rad * Math.sin(th));
+        }
+        traces.push({
+          type: 'scatter', mode: 'lines', x: cx, y: cy,
+          xaxis: `x${i + 1}`, yaxis: `y${i + 1}`,
+          line: { color, width: 1.4, dash: cname.includes('full') ? 'dash' : 'solid' },
+          name: cname, hoverinfo: 'name', showlegend: i === 0,
+        } as PlotlyData);
+      }
+  }
   const axc = { ...AXIS, scaleanchor: undefined };
   const lay: Record<string, unknown> = {
     ...DARK, grid: { rows: 1, columns: 3, pattern: 'independent' },
@@ -468,6 +489,34 @@ export function plotFountain(el: HTMLElement, r: PsfResult,
       aspectmode: 'cube',
       camera: { eye: { x: 1.5, y: -1.5, z: 0.8 } },
     },
+  } as PlotlyLayout, { responsive: true });
+}
+
+/** Shell sample density vs |k| (grid units), log y, Nyquist line at 1. */
+export function plotShellDensity(el: HTMLElement, ens: DensityProfile,
+                                 full: DensityProfile, ensLabel: string): void {
+  const mk = (d: DensityProfile, name: string, color: string, dash?: 'dash'): PlotlyData => ({
+    type: 'scatter', mode: 'lines', x: [...d.r], y: [...d.dens],
+    name, line: { color, width: 1.6, dash },
+  } as PlotlyData);
+  const traces: PlotlyData[] = [mk(ens, `ensemble (${ensLabel})`, '#4fd1c5')];
+  const same = Math.abs(full.rN - ens.rN) < 1e-9 && full.dens.length === ens.dens.length
+    && full.dens.every((v, i) => v === ens.dens[i]);
+  if (!same) traces.push(mk(full, 'full set', '#8899aa', 'dash'));
+  Plotly.react(el, traces, {
+    ...DARK,
+    margin: { l: 55, r: 10, t: 40, b: 40 },
+    title: { text: `shell sample density — Nyquist-complete while ≥ 1 sample per (1/FOV)³ cell · r<sub>N</sub> ${ens.rN.toFixed(0)}${same ? '' : ` / full ${full.rN.toFixed(0)}`} of kmax ${ens.kmaxGrid.toFixed(0)}`, font: { size: 13 } },
+    xaxis: { ...AXIS, title: { text: '|k| (grid units, 1 = 1/FOV)' } },
+    yaxis: { ...AXIS, type: 'log', title: { text: 'samples / cell' }, exponentformat: 'power' },
+    shapes: [
+      { type: 'line', xref: 'paper', x0: 0, x1: 1, y0: 0, y1: 0, yref: 'y',
+        line: { color: '#e0526b', width: 1, dash: 'dot' } },  // log10(1) = 0
+      { type: 'line', x0: ens.rN, x1: ens.rN, yref: 'paper', y0: 0, y1: 1,
+        line: { color: '#4fd1c5', width: 1, dash: 'dot' } },
+      ...(same ? [] : [{ type: 'line', x0: full.rN, x1: full.rN, yref: 'paper', y0: 0, y1: 1,
+        line: { color: '#8899aa', width: 1, dash: 'dot' } } as object]),
+    ],
   } as PlotlyLayout, { responsive: true });
 }
 
