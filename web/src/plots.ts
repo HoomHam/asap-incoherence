@@ -212,32 +212,42 @@ export function plotProjections(el: HTMLElement, t: TrajData, ilvs: number[], mo
   return stride > 1 ? `showing every ${stride}ᵗʰ sample` : null;
 }
 
-function centralSlice(mag: Float32Array, n: number): number[][] {
-  // slice at x = c (matches reference aal[c]): rows y, cols z
-  const c = n >> 1;
+export type SlicePlane = 'yz' | 'xz' | 'xy';
+
+function volSlice(mag: Float32Array, n: number, plane: SlicePlane, idx: number): number[][] {
+  // volume layout: mag[(x·n + y)·n + z]; central yz (x = n/2) matches reference aal[c]
+  const i = Math.min(n - 1, Math.max(0, idx));
   const rows: number[][] = [];
-  for (let y = 0; y < n; y++) {
+  for (let a = 0; a < n; a++) {
     const row: number[] = [];
-    for (let z = 0; z < n; z++) row.push(Math.log10(mag[(c * n + y) * n + z] + 1e-5));
+    for (let b = 0; b < n; b++) {
+      const v = plane === 'yz' ? mag[(i * n + a) * n + b]   // rows y, cols z
+              : plane === 'xz' ? mag[(a * n + i) * n + b]   // rows x, cols z
+              :                  mag[(a * n + b) * n + i];  // rows x, cols y
+      row.push(Math.log10(v + 1e-5));
+    }
     rows.push(row);
   }
   return rows;
 }
 
-/** |PSF| and |alias| central slices, log10, magma. */
-export function plotPsfSlices(el: HTMLElement, r: PsfResult): void {
+/** |PSF| and |alias| slices, log10, magma. */
+export function plotPsfSlices(el: HTMLElement, r: PsfResult,
+                              plane: SlicePlane = 'yz', idx?: number): void {
+  const i = idx ?? r.n >> 1;
   const magP = absVol(r.psfRe, r.psfIm);
   const magA = absVol(r.aliasRe, r.aliasIm);
+  const perp = plane === 'yz' ? 'x' : plane === 'xz' ? 'y' : 'z';
   const traces: PlotlyData[] = [
-    { type: 'heatmap', z: centralSlice(magP, r.n), colorscale: MAGMA, zmin: -4, zmax: 0,
+    { type: 'heatmap', z: volSlice(magP, r.n, plane, i), colorscale: MAGMA, zmin: -4, zmax: 0,
       colorbar: { title: { text: 'log₁₀|PSF|', font: { size: 11 } }, thickness: 12, len: 0.45, x: 1.0, y: 0.78 }, xaxis: 'x', yaxis: 'y' } as PlotlyData,
-    { type: 'heatmap', z: centralSlice(magA, r.n), colorscale: MAGMA, zmin: -4, zmax: -0.5,
+    { type: 'heatmap', z: volSlice(magA, r.n, plane, i), colorscale: MAGMA, zmin: -4, zmax: -0.5,
       colorbar: { title: { text: 'log₁₀|alias|', font: { size: 11 } }, thickness: 12, len: 0.45, x: 1.0, y: 0.22 }, xaxis: 'x2', yaxis: 'y2' } as PlotlyData,
   ];
   Plotly.react(el, traces, {
     ...DARK, grid: { rows: 1, columns: 2, pattern: 'independent' },
     margin: { l: 40, r: 10, t: 40, b: 35 },
-    title: { text: `central slice — |PSF| (left) and |alias = PSF − PSF<sub>full</sub>| (right), ${r.label}`, font: { size: 13 } },
+    title: { text: `${plane} slice @ ${perp} = ${i} — |PSF| (left) and |alias = PSF − PSF<sub>full</sub>| (right), ${r.label}`, font: { size: 13 } },
     xaxis: { ...AXIS, constrain: 'domain' }, yaxis: { ...AXIS, scaleanchor: 'x' },
     xaxis2: { ...AXIS, constrain: 'domain' }, yaxis2: { ...AXIS, scaleanchor: 'x2' },
   } as PlotlyLayout, { responsive: true });

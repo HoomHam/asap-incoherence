@@ -162,6 +162,15 @@
           <div class="plot" id="plot-proj"></div>
         </div>
         <div class="view" id="view-psf">
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px">
+            <select id="slice-plane">
+              <option value="yz" selected>yz plane (slice along x)</option>
+              <option value="xz">xz plane (slice along y)</option>
+              <option value="xy">xy plane (slice along z)</option>
+            </select>
+            <input type="range" id="slice-idx" min="0" max="63" step="1" value="32" style="flex:0 1 260px">
+            <span class="note" id="slice-val" style="margin:0"></span>
+          </div>
           <div class="plot" id="plot-slices"></div>
           <div class="plot" id="plot-shells"></div>
           <div class="plot" id="plot-alias"></div>

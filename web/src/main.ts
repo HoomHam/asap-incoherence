@@ -126,7 +126,7 @@ function renderActive() {
       $('note-proj').textContent = note ?? '';
       rendered.add('proj');
     } else if (activeView === 'psf' && lastPsf && !rendered.has('psf')) {
-      plots.plotPsfSlices($('plot-slices'), lastPsf);
+      renderSlices();
       plots.plotShells($('plot-shells'), lastPsf);
       plots.plotAliasRadial($('plot-alias'), lastPsf);
       $('metrics-box').innerHTML = metricsTable([lastPsf]);
@@ -181,6 +181,19 @@ $('proj-animate').addEventListener('click', () => {
 });
 for (const id of ['fountain-field', 'fountain-plane'])
   $(id).addEventListener('change', () => { rendered.delete('fountain'); renderActive(); });
+
+// ---------------------------------------------------------------- PSF slice browser
+function renderSlices() {
+  if (!lastPsf) return;
+  const plane = ($('slice-plane') as HTMLSelectElement).value as plots.SlicePlane;
+  const slider = $('slice-idx') as HTMLInputElement;
+  const idx = Math.min(lastPsf.n - 1, parseInt(slider.value, 10) || 0);
+  const perp = plane === 'yz' ? 'x' : plane === 'xz' ? 'y' : 'z';
+  $('slice-val').textContent = `${perp} = ${idx} / ${lastPsf.n - 1}`;
+  plots.plotPsfSlices($('plot-slices'), lastPsf, plane, idx);
+}
+$('slice-plane').addEventListener('change', renderSlices);
+$('slice-idx').addEventListener('input', renderSlices);
 $('ens-expr').addEventListener('keydown', (e) => { if ((e as KeyboardEvent).key === 'Enter') updateViews(); });
 
 // ---------------------------------------------------------------- polyhedron
@@ -403,6 +416,9 @@ $('btn-psf').addEventListener('click', async () => {
   ($('btn-psf') as HTMLButtonElement).disabled = true;
   try {
     lastPsf = await request<PsfResult>('psf', { ilvs, n, label });
+    const slider = $('slice-idx') as HTMLInputElement;
+    slider.max = `${lastPsf.n - 1}`;
+    slider.value = `${lastPsf.n >> 1}`;
     rendered.delete('psf'); rendered.delete('fan'); rendered.delete('fountain');
     ($('btn-compare') as HTMLButtonElement).disabled = false;
     setStatus(`PSF done — max/noise-like = ${lastPsf.aliasStats.coh.toFixed(2)}`);
