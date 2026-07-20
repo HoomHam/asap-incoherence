@@ -286,6 +286,12 @@ const projAnim = makeReadoutAnim('proj-animate', 'proj-frame', 'note-proj', 'pro
 // and the path bends like the real spiral.
 let polyAnimId: number | null = null;
 
+const polySpeed = () => Math.pow(2, parseFloat(($('poly-speed') as HTMLInputElement).value));
+$('poly-speed').addEventListener('input', () => {
+  const s = polySpeed();
+  $('poly-speed-val').textContent = `${parseFloat(s.toFixed(2))}×`;
+});
+
 function stopPolyAnim() {
   if (polyAnimId !== null) { cancelAnimationFrame(polyAnimId); polyAnimId = null; }
   $('poly-animate').textContent = '▶ animate sequence';
@@ -300,7 +306,9 @@ function startPolyAnim() {
   // proportionally so relative durations are visible. Clamped to stay watchable.
   const REP_MS = Math.min(20000, Math.max(1000, 6000 * lastParams.at / V3_DEFAULTS.at));
   const TRAIL = 18;                       // very short window: trail dies fast
-  const t0 = performance.now();
+  // virtual clock: advances at wall-clock × speed so the slider acts live
+  let vt = 0;
+  let lastNow = performance.now();
   const el = $('plot-poly');
   const scratch = new Float32Array(t.NI * 3);
   const trails = Array.from({ length: t.NI }, () => ({
@@ -314,7 +322,10 @@ function startPolyAnim() {
   const CAM_FAR = 2.17;                   // plotly default eye distance
   let camMax = 0, camDist = 0.85;
   const step = () => {
-    const el0 = performance.now() - t0;
+    const now = performance.now();
+    vt += (now - lastNow) * polySpeed();
+    lastNow = now;
+    const el0 = vt;
     const done = el0 >= t.NREPS * REP_MS;  // single pass; last frame = full k
     const rep = done ? t.NREPS - 1 : Math.floor(el0 / REP_MS);
     const ph = done ? 1 : (el0 % REP_MS) / REP_MS;
