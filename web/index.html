@@ -168,7 +168,11 @@
               <option value="xz">xz plane (slice along y)</option>
               <option value="xy">xy plane (slice along z)</option>
             </select>
-            <input type="range" id="slice-idx" min="0" max="63" step="1" value="32" style="flex:0 1 260px">
+            <div style="position:relative;flex:0 1 260px;display:flex;align-items:center">
+              <input type="range" id="slice-idx" min="0" max="63" step="1" value="32" style="width:100%">
+              <span id="slice-center" title="central slice"
+                    style="position:absolute;top:1px;bottom:1px;width:2px;background:#7f94ad99;border-radius:1px;pointer-events:none"></span>
+            </div>
             <span class="note" id="slice-val" style="margin:0"></span>
           </div>
           <div class="plot" id="plot-slices"></div>

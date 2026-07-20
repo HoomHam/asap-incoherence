@@ -183,7 +183,18 @@ for (const id of ['fountain-field', 'fountain-plane'])
   $(id).addEventListener('change', () => { rendered.delete('fountain'); renderActive(); });
 
 // ---------------------------------------------------------------- PSF slice browser
+function positionCenterTick() {
+  // mark the central-slice position; thumb travel is (width − thumbW), thumb ≈ 16px
+  const slider = $('slice-idx') as HTMLInputElement;
+  const max = parseInt(slider.max, 10) || 1;
+  const frac = ((max + 1) >> 1) / max;
+  const w = slider.offsetWidth;
+  if (w > 0) $('slice-center').style.left = `${8 + frac * (w - 16) - 1}px`;
+}
+window.addEventListener('resize', positionCenterTick);
+
 function renderSlices() {
+  positionCenterTick();
   if (!lastPsf) return;
   const plane = ($('slice-plane') as HTMLSelectElement).value as plots.SlicePlane;
   const slider = $('slice-idx') as HTMLInputElement;
