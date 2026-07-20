@@ -205,7 +205,7 @@ export function plotProjections(el: HTMLElement, t: TrajData, ilvs: number[], mo
         traces.push({
           type: 'scatter', mode: 'lines', x: cx, y: cy,
           xaxis: `x${i + 1}`, yaxis: `y${i + 1}`,
-          line: { color, width: 1.4, dash: cname.includes('full') ? 'dash' : 'solid' },
+          line: { color, width: 2.5, dash: cname.includes('full') ? 'dash' : 'solid' },
           name: cname, hoverinfo: 'name', showlegend: i === 0,
         } as PlotlyData);
       }
@@ -219,16 +219,15 @@ export function plotProjections(el: HTMLElement, t: TrajData, ilvs: number[], mo
     xaxis2: { ...axc, title: { text: 'kx' } }, yaxis2: { ...axc, title: { text: 'kz' }, scaleanchor: 'x2' },
     xaxis3: { ...axc, title: { text: 'ky' } }, yaxis3: { ...axc, title: { text: 'kz' }, scaleanchor: 'x3' },
   };
-  if (upTo !== undefined) {
-    // animation frame: pin all axes to the full k extent (|k| <= kmax)
-    let km = 1e-9;
-    for (let p = 0; p < t.NPTS; p++)
-      km = Math.max(km, Math.hypot(t.kx[p], t.ky[p], t.kz[p]));
-    const range = [-1.05 * km, 1.05 * km];
-    for (const a of ['xaxis', 'yaxis', 'xaxis2', 'yaxis2', 'xaxis3', 'yaxis3'])
-      lay[a] = { ...(lay[a] as object), range, autorange: false };
-    lay.uirevision = 'proj-anim';
-  }
+  // pin all axes to the k extent (|k| <= kmax): stable during animation, and
+  // keeps the r_N circles honestly scaled instead of autorange padding them out
+  let km = 1e-9;
+  for (let p = 0; p < t.NPTS; p++)
+    km = Math.max(km, Math.hypot(t.kx[p], t.ky[p], t.kz[p]));
+  const range = [-1.05 * km, 1.05 * km];
+  for (const a of ['xaxis', 'yaxis', 'xaxis2', 'yaxis2', 'xaxis3', 'yaxis3'])
+    lay[a] = { ...(lay[a] as object), range, autorange: false };
+  if (upTo !== undefined) lay.uirevision = 'proj-anim';
   Plotly.react(el, traces, lay as PlotlyLayout, { responsive: true });
   return stride > 1 ? `showing every ${stride}ᵗʰ sample` : null;
 }
@@ -504,12 +503,18 @@ export function plotShellDensity(el: HTMLElement, ens: DensityProfile,
   const same = Math.abs(full.rN - ens.rN) < 1e-9 && full.dens.length === ens.dens.length
     && full.dens.every((v, i) => v === ens.dens[i]);
   if (!same) traces.push(mk(full, 'full set', '#8899aa', 'dash'));
+  let ymax = 1;
+  for (const d of [ens, full]) for (const v of d.dens) if (v > ymax) ymax = v;
   Plotly.react(el, traces, {
     ...DARK,
     margin: { l: 55, r: 10, t: 40, b: 40 },
     title: { text: `shell sample density — Nyquist-complete while ≥ 1 sample per (1/FOV)³ cell · r<sub>N</sub> ${ens.rN.toFixed(0)}${same ? '' : ` / full ${full.rN.toFixed(0)}`} of kmax ${ens.kmaxGrid.toFixed(0)}`, font: { size: 13 } },
     xaxis: { ...AXIS, title: { text: '|k| (grid units, 1 = 1/FOV)' } },
-    yaxis: { ...AXIS, type: 'log', title: { text: 'samples / cell' }, exponentformat: 'power' },
+    yaxis: { ...AXIS, type: 'log', title: { text: 'samples / cell' }, exponentformat: 'power',
+             range: [-2.5, Math.log10(ymax) + 0.3], autorange: false },
+    annotations: [{ x: 1, xref: 'paper', xanchor: 'right', y: 0, yref: 'y', yanchor: 'bottom',
+                    text: 'Nyquist: 1 sample / cell', showarrow: false,
+                    font: { size: 10, color: '#e0526b' } }],
     shapes: [
       { type: 'line', xref: 'paper', x0: 0, x1: 1, y0: 0, y1: 0, yref: 'y',
         line: { color: '#e0526b', width: 1, dash: 'dot' } },  // log10(1) = 0
