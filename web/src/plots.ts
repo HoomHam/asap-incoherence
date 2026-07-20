@@ -230,9 +230,9 @@ export function plotPsfSlices(el: HTMLElement, r: PsfResult): void {
   const magA = absVol(r.aliasRe, r.aliasIm);
   const traces: PlotlyData[] = [
     { type: 'heatmap', z: centralSlice(magP, r.n), colorscale: MAGMA, zmin: -4, zmax: 0,
-      colorbar: { title: { text: 'log₁₀|PSF|' }, thickness: 12, len: 0.8 }, xaxis: 'x', yaxis: 'y' } as PlotlyData,
+      colorbar: { title: { text: 'log₁₀|PSF|', font: { size: 11 } }, thickness: 12, len: 0.45, x: 1.0, y: 0.78 }, xaxis: 'x', yaxis: 'y' } as PlotlyData,
     { type: 'heatmap', z: centralSlice(magA, r.n), colorscale: MAGMA, zmin: -4, zmax: -0.5,
-      colorbar: { title: { text: 'log₁₀|alias|' }, thickness: 12, len: 0.8, x: 1.0 }, xaxis: 'x2', yaxis: 'y2' } as PlotlyData,
+      colorbar: { title: { text: 'log₁₀|alias|', font: { size: 11 } }, thickness: 12, len: 0.45, x: 1.0, y: 0.22 }, xaxis: 'x2', yaxis: 'y2' } as PlotlyData,
   ];
   Plotly.react(el, traces, {
     ...DARK, grid: { rows: 1, columns: 2, pattern: 'independent' },
