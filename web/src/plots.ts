@@ -496,7 +496,8 @@ export function plotFountain(el: HTMLElement, r: PsfResult,
 export function plotShellDensity(el: HTMLElement, ens: DensityProfile,
                                  full: DensityProfile, ensLabel: string): void {
   const mk = (d: DensityProfile, name: string, color: string, dash?: 'dash'): PlotlyData => ({
-    type: 'scatter', mode: 'lines', x: [...d.r], y: [...d.dens],
+    type: 'scatter', mode: 'lines', x: [...d.r],
+    y: [...d.dens].map(v => (v > 0 ? v : null)),  // empty shells: gap, not a log-axis spike
     name, line: { color, width: 1.6, dash },
   } as PlotlyData);
   const traces: PlotlyData[] = [mk(ens, `ensemble (${ensLabel})`, '#4fd1c5')];
