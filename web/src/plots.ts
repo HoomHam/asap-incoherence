@@ -237,7 +237,7 @@ export function plotPsfSlices(el: HTMLElement, r: PsfResult): void {
   Plotly.react(el, traces, {
     ...DARK, grid: { rows: 1, columns: 2, pattern: 'independent' },
     margin: { l: 40, r: 10, t: 40, b: 35 },
-    title: { text: `central slice — |PSF| (left) and |alias = PSF − PSF_full| (right), ${r.label}`, font: { size: 13 } },
+    title: { text: `central slice — |PSF| (left) and |alias = PSF − PSF<sub>full</sub>| (right), ${r.label}`, font: { size: 13 } },
     xaxis: { ...AXIS, constrain: 'domain' }, yaxis: { ...AXIS, scaleanchor: 'x' },
     xaxis2: { ...AXIS, constrain: 'domain' }, yaxis2: { ...AXIS, scaleanchor: 'x2' },
   } as PlotlyLayout, { responsive: true });
