@@ -251,7 +251,8 @@ function minPairAngleDeg(pts: Float32Array, count: number): number {
 function makeReadoutAnim(btnId: string, frameId: string, noteId: string, viewKey: string,
                          needsWebgl: boolean,
                          render: (upTo: number) => string | null,
-                         seqCount?: () => number) {
+                         seqCount?: () => number,
+                         speedFn?: () => number) {
   let id: number | null = null;
   const stop = () => {
     if (id !== null) { cancelAnimationFrame(id); id = null; }
@@ -269,9 +270,14 @@ function makeReadoutAnim(btnId: string, frameId: string, noteId: string, viewKey
     const nSeq = seqCount ? seqCount() : 1;
     const totalMs = seqCount ? Math.min(30000, DUR_MS * Math.sqrt(nSeq)) : DUR_MS;
     const totalSamples = nSeq * t.NPTS;
-    const t0 = performance.now();
+    // virtual clock so a speed slider (if any) acts live mid-run
+    let vt = 0;
+    let lastNow = performance.now();
     const step = () => {
-      const ph = Math.min(1, (performance.now() - t0) / totalMs);
+      const now = performance.now();
+      vt += (now - lastNow) * (speedFn ? speedFn() : 1);
+      lastNow = now;
+      const ph = Math.min(1, vt / totalMs);
       const upTo = Math.max(2, Math.ceil(ph * totalSamples));
       const note = render(upTo);
       const cur = Math.min(nSeq - 1, Math.floor((upTo - 1) / t.NPTS));
@@ -300,9 +306,13 @@ const shownCurveCount = () => {
   const n = currentEnsemble().length;
   return n > 256 ? Math.ceil(n / Math.ceil(n / 256)) : n;
 };
+const curvesSpeed = () => Math.pow(2, parseFloat(($('curves-speed') as HTMLInputElement).value));
+$('curves-speed').addEventListener('input', () => {
+  $('curves-speed-val').textContent = `${parseFloat(curvesSpeed().toFixed(2))}×`;
+});
 const curveAnim = makeReadoutAnim('curves-animate', 'curves-frame', 'note-curves', 'curves', true,
   (upTo) => plots.plotCurves3D($('plot-curves'), traj!, currentEnsemble(), colorMode(), upTo, true),
-  shownCurveCount);
+  shownCurveCount, curvesSpeed);
 const projAnim = makeReadoutAnim('proj-animate', 'proj-frame', 'note-proj', 'proj', false,
   (upTo) => plots.plotProjections($('plot-proj'), traj!, currentEnsemble(), colorMode(), upTo));
 

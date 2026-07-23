@@ -114,7 +114,9 @@ export function plotCurves3D(el: HTMLElement, t: TrajData, ilvs: number[], mode:
     const c = colorOf(mode, g, t.NI, t.NREPS);
     return {
       type: 'scatter3d', mode: 'lines', ...s,
-      line: { color: turbo(c.v / c.vmax), width: 2 },
+      // turbo reversed: first-fired curves get the light end, visible on the
+      // dark background; the dark end lands on later curves over a lit scene
+      line: { color: turbo(1 - c.v / c.vmax), width: 2 },
       name: `ilv ${g} (charge ${g % t.NI}, rot ${Math.floor(g / t.NI)})`, hoverinfo: 'name',
     } as PlotlyData;
   });
