@@ -304,6 +304,10 @@ const polyTrail = () => parseInt(($('poly-trail') as HTMLInputElement).value, 10
 $('poly-trail').addEventListener('input', () => {
   $('poly-trail-val').textContent = `${polyTrail()}`;
 });
+const polyZoom = () => Math.pow(2, parseFloat(($('poly-zoom') as HTMLInputElement).value));
+$('poly-zoom').addEventListener('input', () => {
+  $('poly-zoom-val').textContent = `${parseFloat(polyZoom().toFixed(2))}×`;
+});
 
 function stopPolyAnim() {
   if (polyAnimId !== null) { cancelAnimationFrame(polyAnimId); polyAnimId = null; }
@@ -329,11 +333,8 @@ function startPolyAnim() {
   // global kmax from ilv 0, rep 0 — magnitude law is shared across ilvs
   let kmax = 1e-9;
   for (let p = 0; p < t.NPTS; p++) kmax = Math.max(kmax, Math.hypot(t.kx[p], t.ky[p], t.kz[p]));
-  // camera: two rates — the polyhedron radius grows ~linearly with the readout,
-  // the camera pulls back only as sqrt of that, so early frames stay close to
-  // k0 while the apparent size still grows severalfold (scaling stays visible).
-  const CAM_FAR = 2.17;                   // plotly default eye distance
-  let camMax = 0, camDist = 0.55;
+  // camera: fixed distance, user-driven via the zoom slider (live each frame)
+  const CAM_FAR = 2.17;                   // plotly default eye distance = 1x
   const step = () => {
     const now = performance.now();
     vt += (now - lastNow) * polySpeed();
@@ -352,11 +353,8 @@ function startPolyAnim() {
       tr.x.push(x); tr.y.push(y); tr.z.push(z);
       while (tr.x.length > TRAIL) { tr.x.shift(); tr.y.shift(); tr.z.shift(); }
     }
-    camMax = Math.max(camMax, scale);
-    const camTarget = done ? CAM_FAR : Math.min(CAM_FAR, 0.55 + 1.62 * Math.sqrt(camMax));
-    camDist += (camTarget - camDist) * 0.08;
     plots.plotPolyhedron(el, scratch, t.NI,
-      'readout animation — one interleaf set, rep 0', trails, done ? CAM_FAR : camDist);
+      'readout animation — one interleaf set, rep 0', trails, CAM_FAR / polyZoom());
     $('poly-frame').textContent =
       `t ${(ph * lastParams.at * 1e3).toFixed(2)} ms · r/kmax ${scale.toFixed(2)}`;
     if (done) {
