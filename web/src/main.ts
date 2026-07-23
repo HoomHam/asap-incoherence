@@ -313,8 +313,18 @@ $('curves-speed').addEventListener('input', () => {
 const curveAnim = makeReadoutAnim('curves-animate', 'curves-frame', 'note-curves', 'curves', true,
   (upTo) => plots.plotCurves3D($('plot-curves'), traj!, currentEnsemble(), colorMode(), upTo, true),
   shownCurveCount, curvesSpeed);
+let projNyqCache: { key: string; rEns: number; rFull: number } | null = null;
 const projAnim = makeReadoutAnim('proj-animate', 'proj-frame', 'note-proj', 'proj', false,
-  (upTo) => plots.plotProjections($('plot-proj'), traj!, currentEnsemble(), colorMode(), upTo));
+  (upTo) => {
+    const ilvs = currentEnsemble();
+    const key = `${($('ens-expr') as HTMLInputElement).value}|${traj!.NI}|${traj!.NREPS}|${traj!.kmax}`;
+    if (!projNyqCache || projNyqCache.key !== key) {
+      const ensD = shellDensity(traj!, ilvs), fullD = shellDensity(traj!, allIlvs());
+      projNyqCache = { key, rEns: ensD.rN, rFull: fullD.rN };
+    }
+    return plots.plotProjections($('plot-proj'), traj!, ilvs, colorMode(), upTo,
+      { rEns: projNyqCache.rEns, rFull: projNyqCache.rFull });
+  });
 
 // --- polyhedron sequence animation: replay the actual k(t) samples rep by
 // rep — orientation snaps between reps (cumulative, as kasap applies it)

@@ -187,7 +187,8 @@ export function plotProjections(el: HTMLElement, t: TrajData, ilvs: number[], mo
     const c = colorOf(mode, g, t.NI, t.NREPS);
     vmax = c.vmax;
     for (let p = 0; p < (upTo ?? t.NPTS); p += stride) {
-      ax.push(t.kx[base + p]); ay.push(t.ky[base + p]); az.push(t.kz[base + p]); cv.push(c.v);
+      // turbo reversed (matches 3D curves): early ilvs light, late ilvs dark
+      ax.push(t.kx[base + p]); ay.push(t.ky[base + p]); az.push(t.kz[base + p]); cv.push(c.vmax - c.v);
     }
   }
   const planes: [string, number[], number[]][] = [['xy', ax, ay], ['xz', ax, az], ['yz', ay, az]];
@@ -198,9 +199,19 @@ export function plotProjections(el: HTMLElement, t: TrajData, ilvs: number[], mo
     name, hoverinfo: 'skip', showlegend: false,
   } as PlotlyData));
   if (nyq) {
-    // Nyquist-radius circles: inside = shell density >= 1 sample/(1/FOV)^3 cell
-    const circles: [number, string, string][] = [[nyq.rEns / t.fov, '#4fd1c5', 'r_N ensemble']];
-    if (Math.abs(nyq.rFull - nyq.rEns) > 1e-9)
+    // Nyquist-radius circles: inside = shell density >= 1 sample/(1/FOV)^3 cell.
+    // During animation a circle appears once the growing readout reaches it.
+    let kNow = Infinity;
+    if (upTo !== undefined) {
+      kNow = 0;
+      for (let p = 0; p < Math.min(upTo, t.NPTS); p++) {
+        const h = Math.hypot(t.kx[p], t.ky[p], t.kz[p]);
+        if (!Number.isNaN(h)) kNow = Math.max(kNow, h);
+      }
+    }
+    const circles: [number, string, string][] = [];
+    if (nyq.rEns / t.fov <= kNow) circles.push([nyq.rEns / t.fov, '#4fd1c5', 'r_N ensemble']);
+    if (Math.abs(nyq.rFull - nyq.rEns) > 1e-9 && nyq.rFull / t.fov <= kNow)
       circles.push([nyq.rFull / t.fov, '#8899aa', 'r_N full set']);
     for (let i = 0; i < 3; i++)
       for (const [rad, color, cname] of circles) {
