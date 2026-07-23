@@ -234,6 +234,9 @@ export function plotProjections(el: HTMLElement, t: TrajData, ilvs: number[], mo
   const lay: Record<string, unknown> = {
     ...DARK, grid: { rows: 1, columns: 3, pattern: 'independent' },
     margin: { l: 45, r: 10, t: 40, b: 40 },
+    // explicit: plotly's auto-legend vanishes when every legend trace is
+    // 'legendonly' (animation start), collapsing the reserved legend width
+    showlegend: !!nyq,
     title: { text: 'plane projections (sample points)', font: { size: 13 } },
     xaxis: { ...axc, title: { text: 'kx' } }, yaxis: { ...axc, title: { text: 'ky' }, scaleanchor: 'x' },
     xaxis2: { ...axc, title: { text: 'kx' } }, yaxis2: { ...axc, title: { text: 'kz' }, scaleanchor: 'x2' },
