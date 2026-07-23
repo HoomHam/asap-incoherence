@@ -413,12 +413,14 @@ export function plotPolyhedron(el: HTMLElement, pts: Float32Array, count: number
       hoverinfo: 'text', name: 'charges',
     } as PlotlyData,
   ];
-  const bare = { ...AXIS, backgroundcolor: '#14161c', showbackground: true,
-                 title: { text: '' }, showticklabels: false };
+  // camDist set → animation frames: no grids/backgrounds at all, camera driven
+  // (omit uirevision so plotly applies it every frame). Unset → static view,
+  // user camera preserved via uirevision.
+  const bare = camDist !== undefined
+    ? { visible: false }
+    : { ...AXIS, backgroundcolor: '#14161c', showbackground: true,
+        title: { text: '' }, showticklabels: false };
   const range = [-1.05, 1.05];
-  // camDist set → animation drives the camera (along the default view diagonal);
-  // omit uirevision so plotly applies it every frame. Unset → static view, user
-  // camera preserved via uirevision.
   const U = 0.5773502691896258; // 1/sqrt(3)
   const scene: Record<string, unknown> = {
     xaxis: { ...bare, range }, yaxis: { ...bare, range }, zaxis: { ...bare, range },

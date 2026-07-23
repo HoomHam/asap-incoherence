@@ -300,6 +300,10 @@ $('poly-speed').addEventListener('input', () => {
   const s = polySpeed();
   $('poly-speed-val').textContent = `${parseFloat(s.toFixed(2))}×`;
 });
+const polyTrail = () => parseInt(($('poly-trail') as HTMLInputElement).value, 10) || 18;
+$('poly-trail').addEventListener('input', () => {
+  $('poly-trail-val').textContent = `${polyTrail()}`;
+});
 
 function stopPolyAnim() {
   if (polyAnimId !== null) { cancelAnimationFrame(polyAnimId); polyAnimId = null; }
@@ -311,10 +315,9 @@ function startPolyAnim() {
   if (!traj) return;
   if (!plots.HAS_WEBGL) { setStatus('animation needs WebGL (hardware acceleration)', 'error'); return; }
   const t = traj;
-  // 6 s per rep at the v3 default readout (5.12 ms); other readouts scale
-  // proportionally so relative durations are visible. Clamped to stay watchable.
+  // one readout only (rep 0, no rotations): 6 s at the v3 default readout
+  // (5.12 ms); other readouts scale proportionally. Clamped to stay watchable.
   const REP_MS = Math.min(20000, Math.max(1000, 6000 * lastParams.at / V3_DEFAULTS.at));
-  const TRAIL = 18;                       // very short window: trail dies fast
   // virtual clock: advances at wall-clock × speed so the slider acts live
   let vt = 0;
   let lastNow = performance.now();
@@ -323,42 +326,42 @@ function startPolyAnim() {
   const trails = Array.from({ length: t.NI }, () => ({
     x: [] as number[], y: [] as number[], z: [] as number[],
   }));
-  // global kmax from ilv 0, rep 0 — magnitude law is shared and rotations preserve |k|
+  // global kmax from ilv 0, rep 0 — magnitude law is shared across ilvs
   let kmax = 1e-9;
   for (let p = 0; p < t.NPTS; p++) kmax = Math.max(kmax, Math.hypot(t.kx[p], t.ky[p], t.kz[p]));
-  // camera: start close on the small polyhedron, pull back as it grows.
-  // Tracks the running max radius (monotone — no per-rep bounce), smooth lag.
+  // camera: two rates — the polyhedron radius grows ~linearly with the readout,
+  // the camera pulls back only as sqrt of that, so early frames stay close to
+  // k0 while the apparent size still grows severalfold (scaling stays visible).
   const CAM_FAR = 2.17;                   // plotly default eye distance
-  let camMax = 0, camDist = 0.85;
+  let camMax = 0, camDist = 0.55;
   const step = () => {
     const now = performance.now();
     vt += (now - lastNow) * polySpeed();
     lastNow = now;
-    const el0 = vt;
-    const done = el0 >= t.NREPS * REP_MS;  // single pass; last frame = full k
-    const rep = done ? t.NREPS - 1 : Math.floor(el0 / REP_MS);
-    const ph = done ? 1 : (el0 % REP_MS) / REP_MS;
+    const done = vt >= REP_MS;             // single readout; last frame = full k
+    const ph = done ? 1 : vt / REP_MS;
     const p = Math.min(t.NPTS - 1, Math.floor(ph * (t.NPTS - 1)));
+    const TRAIL = polyTrail();
     let scale = 0;
     for (let j = 0; j < t.NI; j++) {
-      const lin = p + j * t.NPTS + rep * t.NI * t.NPTS;
+      const lin = p + j * t.NPTS;          // rep 0 only
       const x = t.kx[lin] / kmax, y = t.ky[lin] / kmax, z = t.kz[lin] / kmax;
       scratch[3 * j] = x; scratch[3 * j + 1] = y; scratch[3 * j + 2] = z;
       scale = Math.max(scale, Math.hypot(x, y, z));
       const tr = trails[j];
       tr.x.push(x); tr.y.push(y); tr.z.push(z);
-      if (tr.x.length > TRAIL) { tr.x.shift(); tr.y.shift(); tr.z.shift(); }
+      while (tr.x.length > TRAIL) { tr.x.shift(); tr.y.shift(); tr.z.shift(); }
     }
     camMax = Math.max(camMax, scale);
-    const camTarget = done ? CAM_FAR : Math.min(CAM_FAR, 0.75 + 1.45 * camMax);
+    const camTarget = done ? CAM_FAR : Math.min(CAM_FAR, 0.55 + 1.62 * Math.sqrt(camMax));
     camDist += (camTarget - camDist) * 0.08;
     plots.plotPolyhedron(el, scratch, t.NI,
-      `sequence animation — rep ${rep + 1}/${t.NREPS}`, trails, done ? CAM_FAR : camDist);
+      'readout animation — one interleaf set, rep 0', trails, done ? CAM_FAR : camDist);
     $('poly-frame').textContent =
-      `rep ${rep + 1}/${t.NREPS} · t ${(ph * lastParams.at * 1e3).toFixed(2)} ms · r/kmax ${scale.toFixed(2)}`;
+      `t ${(ph * lastParams.at * 1e3).toFixed(2)} ms · r/kmax ${scale.toFixed(2)}`;
     if (done) {
       stopPolyAnim();
-      $('poly-frame').textContent = `done — ${t.NREPS} repetitions, resting at kmax`;
+      $('poly-frame').textContent = 'done — one readout, resting at kmax';
       return;
     }
     polyAnimId = requestAnimationFrame(step);
