@@ -250,7 +250,8 @@ function minPairAngleDeg(pts: Float32Array, count: number): number {
 // readout duration.
 function makeReadoutAnim(btnId: string, frameId: string, noteId: string, viewKey: string,
                          needsWebgl: boolean,
-                         render: (upTo: number) => string | null) {
+                         render: (upTo: number) => string | null,
+                         seqCount?: () => number) {
   let id: number | null = null;
   const stop = () => {
     if (id !== null) { cancelAnimationFrame(id); id = null; }
@@ -263,16 +264,25 @@ function makeReadoutAnim(btnId: string, frameId: string, noteId: string, viewKey
     const t = traj;
     // one readout, same at-proportional time base as the sequence animation
     const DUR_MS = Math.min(20000, Math.max(1000, 6000 * lastParams.at / V3_DEFAULTS.at));
+    // sequential mode: interleaves fire one by one — per-ilv time shrinks as
+    // 1/sqrt(n) so a full block stays watchable; whole run capped at 30 s
+    const nSeq = seqCount ? seqCount() : 1;
+    const totalMs = seqCount ? Math.min(30000, DUR_MS * Math.sqrt(nSeq)) : DUR_MS;
+    const totalSamples = nSeq * t.NPTS;
     const t0 = performance.now();
     const step = () => {
-      const ph = Math.min(1, (performance.now() - t0) / DUR_MS);
-      const upTo = Math.max(2, Math.ceil(ph * t.NPTS));
+      const ph = Math.min(1, (performance.now() - t0) / totalMs);
+      const upTo = Math.max(2, Math.ceil(ph * totalSamples));
       const note = render(upTo);
-      $(frameId).textContent =
-        `t ${(ph * lastParams.at * 1e3).toFixed(2)} ms · sample ${upTo}/${t.NPTS}`;
+      const cur = Math.min(nSeq - 1, Math.floor((upTo - 1) / t.NPTS));
+      $(frameId).textContent = seqCount
+        ? `ilv ${cur + 1}/${nSeq} · sample ${upTo - cur * t.NPTS}/${t.NPTS}`
+        : `t ${(ph * lastParams.at * 1e3).toFixed(2)} ms · sample ${upTo}/${t.NPTS}`;
       if (ph >= 1) {
         stop();
-        $(frameId).textContent = `done — full readout, ${t.NPTS} samples`;
+        $(frameId).textContent = seqCount
+          ? `done — ${nSeq} interleaves fired, ${t.NPTS} samples each`
+          : `done — full readout, ${t.NPTS} samples`;
         $(noteId).textContent = note ?? '';
         rendered.add(viewKey);
         return;
@@ -285,8 +295,14 @@ function makeReadoutAnim(btnId: string, frameId: string, noteId: string, viewKey
   return { stop, start, running: () => id !== null };
 }
 
+// curves animation caps at 256 drawn curves (stride) — sequence over what's shown
+const shownCurveCount = () => {
+  const n = currentEnsemble().length;
+  return n > 256 ? Math.ceil(n / Math.ceil(n / 256)) : n;
+};
 const curveAnim = makeReadoutAnim('curves-animate', 'curves-frame', 'note-curves', 'curves', true,
-  (upTo) => plots.plotCurves3D($('plot-curves'), traj!, currentEnsemble(), colorMode(), upTo));
+  (upTo) => plots.plotCurves3D($('plot-curves'), traj!, currentEnsemble(), colorMode(), upTo, true),
+  shownCurveCount);
 const projAnim = makeReadoutAnim('proj-animate', 'proj-frame', 'note-proj', 'proj', false,
   (upTo) => plots.plotProjections($('plot-proj'), traj!, currentEnsemble(), colorMode(), upTo));
 

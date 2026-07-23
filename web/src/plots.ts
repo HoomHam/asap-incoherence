@@ -94,7 +94,7 @@ function turbo(t: number): string {
  *  upTo (samples, 1..NPTS) draws only the first part of every curve —
  *  used by the readout animation. Axis ranges stay fixed to the full extent. */
 export function plotCurves3D(el: HTMLElement, t: TrajData, ilvs: number[], mode: ColorMode,
-                             upTo?: number): string | null {
+                             upTo?: number, sequential = false): string | null {
   if (!HAS_WEBGL) { webglNotice(el, '3D curves'); return null; }
   let note: string | null = null;
   let shown = ilvs;
@@ -104,8 +104,13 @@ export function plotCurves3D(el: HTMLElement, t: TrajData, ilvs: number[], mode:
     note = `showing every ${stride}ᵗʰ of ${ilvs.length} interleaves (curve cap 256)`;
   }
   const ptStride = strideFor(t.NPTS, 160);
-  const traces = shown.map(g => {
-    const s = ilvSamples(t, g, ptStride, upTo ?? t.NPTS);
+  const traces = shown.map((g, i) => {
+    // sequential animation: upTo counts samples across the whole ensemble, so
+    // interleaves fire one after another instead of all growing together
+    const cap = sequential && upTo !== undefined
+      ? Math.max(0, Math.min(t.NPTS, upTo - i * t.NPTS))
+      : upTo ?? t.NPTS;
+    const s = ilvSamples(t, g, ptStride, cap);
     const c = colorOf(mode, g, t.NI, t.NREPS);
     return {
       type: 'scatter3d', mode: 'lines', ...s,
