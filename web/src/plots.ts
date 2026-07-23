@@ -209,17 +209,18 @@ export function plotProjections(el: HTMLElement, t: TrajData, ilvs: number[], mo
         if (!Number.isNaN(h)) kNow = Math.max(kNow, h);
       }
     }
-    const circles: [number, string, string][] = [];
-    if (nyq.rEns / t.fov <= kNow) circles.push([nyq.rEns / t.fov, '#4fd1c5', 'r_N ensemble']);
-    if (Math.abs(nyq.rFull - nyq.rEns) > 1e-9 && nyq.rFull / t.fov <= kNow)
+    const circles: [number, string, string][] = [[nyq.rEns / t.fov, '#4fd1c5', 'r_N ensemble']];
+    if (Math.abs(nyq.rFull - nyq.rEns) > 1e-9)
       circles.push([nyq.rFull / t.fov, '#8899aa', 'r_N full set']);
     for (let i = 0; i < 3; i++)
       for (const [rad, color, cname] of circles) {
+        // trace always present (stable legend + plot size); data empty until reached
         const cx: number[] = [], cy: number[] = [];
-        for (let a = 0; a <= 96; a++) {
-          const th = (a / 96) * 2 * Math.PI;
-          cx.push(rad * Math.cos(th)); cy.push(rad * Math.sin(th));
-        }
+        if (rad <= kNow)
+          for (let a = 0; a <= 96; a++) {
+            const th = (a / 96) * 2 * Math.PI;
+            cx.push(rad * Math.cos(th)); cy.push(rad * Math.sin(th));
+          }
         traces.push({
           type: 'scatter', mode: 'lines', x: cx, y: cy,
           xaxis: `x${i + 1}`, yaxis: `y${i + 1}`,
@@ -399,7 +400,8 @@ export function plotPolyhedron(el: HTMLElement, pts: Float32Array, count: number
     const tx: number[] = [], ty: number[] = [], tz: number[] = [];
     const tc: string[] = [], tsz: number[] = [];
     trails.forEach((tr, i) => {
-      const rgb = turbo(i / Math.max(count - 1, 1)).slice(4, -1); // "r,g,b"
+      // turbo reversed (matches curves/projections): early indices light
+      const rgb = turbo(1 - i / Math.max(count - 1, 1)).slice(4, -1); // "r,g,b"
       const L = tr.x.length;
       for (let k = 0; k < L; k++) {
         const age = L > 1 ? k / (L - 1) : 1;          // 0 oldest, 1 newest
@@ -427,7 +429,7 @@ export function plotPolyhedron(el: HTMLElement, pts: Float32Array, count: number
       type: 'scatter3d', mode: 'markers+text', x, y, z, text: txt,
       textfont: { color: '#e8e9ee', size: 10 },
       textposition: 'top center',
-      marker: { size: 5, color: x.map((_, i) => turbo(i / Math.max(count - 1, 1))) },
+      marker: { size: 5, color: x.map((_, i) => turbo(1 - i / Math.max(count - 1, 1))) },
       hoverinfo: 'text', name: 'charges',
     } as PlotlyData,
   ];
