@@ -214,16 +214,17 @@ export function plotProjections(el: HTMLElement, t: TrajData, ilvs: number[], mo
       circles.push([nyq.rFull / t.fov, '#8899aa', 'r_N full set']);
     for (let i = 0; i < 3; i++)
       for (const [rad, color, cname] of circles) {
-        // trace always present (stable legend + plot size); data empty until reached
         const cx: number[] = [], cy: number[] = [];
-        if (rad <= kNow)
-          for (let a = 0; a <= 96; a++) {
-            const th = (a / 96) * 2 * Math.PI;
-            cx.push(rad * Math.cos(th)); cy.push(rad * Math.sin(th));
-          }
+        for (let a = 0; a <= 96; a++) {
+          const th = (a / 96) * 2 * Math.PI;
+          cx.push(rad * Math.cos(th)); cy.push(rad * Math.sin(th));
+        }
         traces.push({
           type: 'scatter', mode: 'lines', x: cx, y: cy,
           xaxis: `x${i + 1}`, yaxis: `y${i + 1}`,
+          // 'legendonly' before the readout reaches the radius: keeps the legend
+          // entry (and the plot width) constant through the whole animation
+          visible: rad <= kNow ? true : 'legendonly',
           line: { color, width: 2.5, dash: cname.includes('full') ? 'dash' : 'solid' },
           name: cname, hoverinfo: 'name', showlegend: i === 0,
         } as PlotlyData);
