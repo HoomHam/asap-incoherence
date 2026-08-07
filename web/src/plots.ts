@@ -459,6 +459,64 @@ export function plotPolyhedron(el: HTMLElement, pts: Float32Array, count: number
   } as PlotlyLayout, { responsive: true });
 }
 
+/** Radial spokes from the origin to each unit direction (slide-style Thomson
+ *  spoke plot). NaN-separated single trace, turbo (reversed) by index. */
+export function plotSpokes(el: HTMLElement, pts: Float32Array, count: number,
+                           title: string): void {
+  if (!HAS_WEBGL) { webglNotice(el, 'spokes'); return; }
+  const xs: (number | null)[] = [], ys: (number | null)[] = [], zs: (number | null)[] = [];
+  const cols: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const c = turbo(1 - i / Math.max(count - 1, 1));
+    xs.push(0, pts[3 * i], null); ys.push(0, pts[3 * i + 1], null); zs.push(0, pts[3 * i + 2], null);
+    cols.push(c, c, c);
+  }
+  const tips: PlotlyData = {
+    type: 'scatter3d', mode: 'markers+text',
+    x: Array.from({ length: count }, (_, i) => pts[3 * i]),
+    y: Array.from({ length: count }, (_, i) => pts[3 * i + 1]),
+    z: Array.from({ length: count }, (_, i) => pts[3 * i + 2]),
+    text: Array.from({ length: count }, (_, i) => `${i}`),
+    textfont: { color: '#e8e9ee', size: 9 }, textposition: 'top center',
+    marker: { size: 3.5, color: Array.from({ length: count }, (_, i) => turbo(1 - i / Math.max(count - 1, 1))) },
+    hoverinfo: 'text',
+  } as PlotlyData;
+  const lines: PlotlyData = {
+    type: 'scatter3d', mode: 'lines', x: xs, y: ys, z: zs,
+    line: { color: cols, width: 4 }, hoverinfo: 'skip',
+  } as PlotlyData;
+  const bare = { ...AXIS, backgroundcolor: '#14161c', showbackground: true,
+                 title: { text: '' }, showticklabels: false };
+  const range = [-1.05, 1.05];
+  Plotly.react(el, [lines, tips], {
+    ...layout3d(title),
+    uirevision: 'spokes',
+    scene: { xaxis: { ...bare, range }, yaxis: { ...bare, range }, zaxis: { ...bare, range },
+             aspectmode: 'cube' },
+  } as PlotlyLayout, { responsive: true });
+}
+
+/** Histogram of pairwise angular separations (degrees, 0–180). */
+export function plotAngleHist(el: HTMLElement, angles: number[], binDeg: number,
+                              title: string): void {
+  const nBins = Math.ceil(180 / binDeg);
+  const counts = new Array(nBins).fill(0);
+  for (const a of angles) counts[Math.min(nBins - 1, Math.floor(a / binDeg))]++;
+  const centers = Array.from({ length: nBins }, (_, i) => (i + 0.5) * binDeg);
+  const trace: PlotlyData = {
+    type: 'bar', x: centers, y: counts, width: binDeg * 0.92,
+    marker: { color: '#5b8fd9' },
+    hovertemplate: '%{x:.0f}° ± ' + (binDeg / 2) + '° : %{y}<extra></extra>',
+  } as PlotlyData;
+  Plotly.react(el, [trace], {
+    ...DARK, margin: { l: 55, r: 10, t: 40, b: 45 },
+    title: { text: title, font: { size: 13 } },
+    xaxis: { ...AXIS, title: { text: 'pairwise angle (deg)' }, range: [0, 180] },
+    yaxis: { ...AXIS, title: { text: 'frequency' } },
+    bargap: 0,
+  } as PlotlyLayout, { responsive: true });
+}
+
 /** PSF fountain: one 3D curve per ray angle (360 rays, 1 deg step), 512 samples
  *  along r in [0, n/2-2], height = log10|field|. NaN-separated single trace,
  *  turbo by ray angle. */

@@ -98,7 +98,7 @@ function currentEnsemble(): number[] {
 
 // ---------------------------------------------------------------- views
 
-const VIEWS = ['curves', 'proj', 'psf', 'fan', 'fountain', 'poly', 'compare', 'about'];
+const VIEWS = ['curves', 'proj', 'psf', 'fan', 'fountain', 'poly', 'angles', 'compare', 'about'];
 let activeView = 'poly';
 for (const btn of $('tabs').querySelectorAll('button')) {
   btn.addEventListener('click', () => {
@@ -146,6 +146,9 @@ function renderActive() {
     } else if (activeView === 'poly' && !rendered.has('poly')) {
       renderPolyhedron();
       rendered.add('poly');
+    } else if (activeView === 'angles' && !rendered.has('angles')) {
+      renderAngles();
+      rendered.add('angles');
     } else if (activeView === 'fountain' && lastPsf && !rendered.has('fountain')) {
       plots.plotFountain($('plot-fountain'), lastPsf,
         ($('fountain-plane') as HTMLSelectElement).value as 'xy' | 'xz' | 'yz',
@@ -159,7 +162,7 @@ function renderActive() {
 
 function invalidateViews(alsoP = false) {
   rendered.delete('curves'); rendered.delete('proj');
-  rendered.delete('poly');
+  rendered.delete('poly'); rendered.delete('angles');
   if (alsoP) { rendered.delete('psf'); rendered.delete('fan'); }
 }
 
@@ -421,6 +424,76 @@ function renderPolyhedron() {
   plots.plotPolyhedron($('plot-poly'), pts, count,
     `convex hull of the ${what} (${count} unit vectors)`);
 }
+
+// ---------------------------------------------------------------- angles tab
+
+// Unit spoke direction of each interleave = its last finite k-space sample
+// (bent-spiral endpoint on the kmax sphere). NaN tails from slew violations
+// are skipped backwards.
+function spokeDirs(t: TrajData, ilvs: number[]): { pts: Float32Array; count: number } {
+  const pts = new Float32Array(ilvs.length * 3);
+  let m = 0;
+  for (const g of ilvs) {
+    const irep = Math.floor(g / t.NI), j = g % t.NI;
+    const base = irep * t.NI * t.NPTS + j * t.NPTS;
+    for (let p = t.NPTS - 1; p >= 0; p--) {
+      const x = t.kx[base + p], y = t.ky[base + p], z = t.kz[base + p];
+      const h = Math.hypot(x, y, z);
+      if (Number.isFinite(h) && h > 1e-9) {
+        pts[3 * m] = x / h; pts[3 * m + 1] = y / h; pts[3 * m + 2] = z / h; m++;
+        break;
+      }
+    }
+  }
+  return { pts: pts.subarray(0, 3 * m) as Float32Array, count: m };
+}
+
+function pairAnglesDeg(pts: Float32Array, count: number): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < count; i++)
+    for (let j = i + 1; j < count; j++) {
+      const d = pts[3*i]*pts[3*j] + pts[3*i+1]*pts[3*j+1] + pts[3*i+2]*pts[3*j+2];
+      out.push((Math.acos(Math.min(1, Math.max(-1, d))) * 180) / Math.PI);
+    }
+  return out;
+}
+
+const SPOKE_CAP = 1024;   // pairwise cost is O(n²); 1024 → ~0.5M pairs, still ms
+
+function renderAngles() {
+  if (!traj) return;
+  const which = ($('angles-which') as HTMLSelectElement).value;
+  let pts: Float32Array, count: number, what: string, strideNote = '';
+  if (which === 'basis') {
+    pts = traj.basis; count = traj.NI; what = `charge basis (NI = ${traj.NI})`;
+  } else if (which === 'reprot') {
+    pts = traj.reprot; count = traj.NREPS; what = `rotation axes (NREPS = ${traj.NREPS})`;
+  } else {
+    let ilvs = currentEnsemble();
+    if (ilvs.length > SPOKE_CAP) {
+      const stride = Math.ceil(ilvs.length / SPOKE_CAP);
+      ilvs = ilvs.filter((_, i) => i % stride === 0);
+      strideNote = ` · every ${stride}ᵗʰ of the ensemble (cap ${SPOKE_CAP})`;
+    }
+    const d = spokeDirs(traj, ilvs);
+    pts = d.pts; count = d.count;
+    const expr = ($('ens-expr') as HTMLInputElement).value.trim() || 'all';
+    what = `ensemble "${expr}" endpoint directions (${count} ilv)`;
+  }
+  if (count < 2) { $('angles-note').textContent = 'need ≥ 2 spokes'; return; }
+  const angles = pairAnglesDeg(pts, count);
+  let min = 180, sum = 0;
+  for (const a of angles) { if (a < min) min = a; sum += a; }
+  const bin = parseFloat(($('angles-bin') as HTMLSelectElement).value) || 2;
+  plots.plotSpokes($('plot-spokes'), pts, count, `${count} radial spokes — ${what}`);
+  plots.plotAngleHist($('plot-anghist'), angles, bin,
+    `pairwise angular separations — ${angles.length.toLocaleString()} pairs`);
+  $('angles-note').textContent =
+    `min ${min.toFixed(1)}° · mean ${(sum / angles.length).toFixed(1)}°${strideNote}`;
+}
+
+for (const id of ['angles-which', 'angles-bin'])
+  $(id).addEventListener('change', () => { rendered.delete('angles'); renderActive(); });
 
 // ---------------------------------------------------------------- metrics table
 

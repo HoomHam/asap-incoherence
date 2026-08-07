@@ -134,6 +134,7 @@
       <div id="topbar">
         <div id="tabs">
           <button data-view="poly" class="active">Polyhedron</button>
+          <button data-view="angles">Angles</button>
           <button data-view="curves">3D curves</button>
           <button data-view="proj">Projections</button>
           <button data-view="psf">PSF</button>
@@ -225,6 +226,27 @@
             <span class="note" id="poly-name" style="margin:0"></span>
           </div>
           <div class="plot tall" id="plot-poly"></div>
+        </div>
+        <div class="view" id="view-angles">
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:8px">
+            <select id="angles-which" style="flex-shrink:0">
+              <option value="basis" selected>charge basis (NI spokes)</option>
+              <option value="reprot">rotation axes (NREPS)</option>
+              <option value="ensemble">ensemble spoke directions</option>
+            </select>
+            <label class="note" style="margin:0;display:flex;align-items:center;gap:6px;flex-shrink:0">bin
+              <select id="angles-bin">
+                <option value="1">1°</option>
+                <option value="2" selected>2°</option>
+                <option value="5">5°</option>
+              </select>
+            </label>
+            <span class="note" id="angles-note" style="margin:0"></span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:12px">
+            <div class="plot" id="plot-spokes" style="flex:1 1 420px;min-height:520px"></div>
+            <div class="plot" id="plot-anghist" style="flex:1 1 420px;min-height:520px"></div>
+          </div>
         </div>
         <div class="view" id="view-compare"><div id="compare-box"><p class="note">Compute a PSF, then press “+ compare” to pin up to 4 ensembles side by side.</p></div></div>
         <div class="view" id="view-about"><div id="about"></div></div>
