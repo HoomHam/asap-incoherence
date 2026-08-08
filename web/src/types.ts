@@ -83,12 +83,14 @@ export interface PsfResult {
 export type WorkerRequest =
   | { id: number; op: 'generate'; params: GenParams }
   | { id: number; op: 'psf'; ilvs: number[]; n: number; label: string }
-  | { id: number; op: 'golden' };
+  | { id: number; op: 'golden' }
+  | { id: number; op: 'hedgehog'; n: number; optimize: boolean };
 
 export type WorkerResponse =
   | { id: number; op: 'generate'; traj: TrajData }
   | { id: number; op: 'psf'; result: PsfResult }
   | { id: number; op: 'golden'; report: GoldenReport }
+  | { id: number; op: 'hedgehog'; pts: Float32Array }
   | { id: number; op: 'progress'; msg: string }
   | { id: number; op: 'error'; msg: string };
 

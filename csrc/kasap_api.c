@@ -131,6 +131,20 @@ EMSCRIPTEN_KEEPALIVE float *kasap_get_basis(void) { return cur_basis; }
 EMSCRIPTEN_KEEPALIVE float *kasap_get_reprot(void) { return cur_reprot; }
 EMSCRIPTEN_KEEPALIVE int    kasap_get_total(void) { return cur_NI * cur_NPTS * cur_NREPS; }
 
+/* Standalone Thomson/Fibonacci spoke solve: n unit vectors via kasap's own
+ * calchedgehog (Fibonacci init, optional Thomson optimization). Independent
+ * of any generated trajectory. Returns pointer to n x 3 floats, NULL on
+ * alloc failure; buffer stays valid until the next call. */
+static float *hedgehog_out = 0;
+EMSCRIPTEN_KEEPALIVE
+float *kasap_hedgehog(int n, int optimize)
+{
+    free(hedgehog_out);
+    hedgehog_out = malloc((size_t)n * 3 * sizeof(float));
+    if (hedgehog_out) calchedgehog(n, optimize, hedgehog_out);
+    return hedgehog_out;
+}
+
 /* Generate the full trajectory set.
  *   NI, NPTS, NREPS : counts
  *   n, at, fov, ms  : radial shape power, readout dur (s), FOV (m), matrix

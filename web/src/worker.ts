@@ -13,6 +13,7 @@ interface EmModule {
   _kasap_generate(...a: number[]): number;
   _kasap_get_kx(): number; _kasap_get_ky(): number; _kasap_get_kz(): number;
   _kasap_get_basis(): number; _kasap_get_reprot(): number;
+  _kasap_hedgehog(n: number, optimize: number): number;
   _nufft_psf(wx: number, wy: number, wz: number, M: number, n: number): number;
   _nufft_get_psf_re(): number; _nufft_get_psf_im(): number;
   _wasm_malloc(n: number): number; _wasm_free(p: number): void;
@@ -213,6 +214,11 @@ self.onmessage = async (ev: MessageEvent<WorkerRequest>) => {
     } else if (req.op === 'golden') {
       const report = await golden(req.id);
       post({ id: req.id, op: 'golden', report });
+    } else if (req.op === 'hedgehog') {
+      const ptr = M._kasap_hedgehog(req.n, req.optimize ? 1 : 0);
+      if (!ptr) throw new Error('hedgehog allocation failed');
+      post({ id: req.id, op: 'hedgehog',
+             pts: M.HEAPF32.slice(ptr >> 2, (ptr >> 2) + req.n * 3) });
     }
   } catch (e) {
     post({ id: req.id, op: 'error', msg: e instanceof Error ? e.message : String(e) });

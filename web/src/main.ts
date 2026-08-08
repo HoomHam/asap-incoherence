@@ -13,7 +13,7 @@ const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'modu
 let nextId = 1;
 const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
 
-function request<T>(op: 'generate' | 'psf' | 'golden', payload: object = {}): Promise<T> {
+function request<T>(op: 'generate' | 'psf' | 'golden' | 'hedgehog', payload: object = {}): Promise<T> {
   const id = nextId++;
   return new Promise<T>((resolve, reject) => {
     pending.set(id, { resolve: resolve as (v: unknown) => void, reject });
@@ -39,6 +39,7 @@ worker.onmessage = (ev: MessageEvent<WorkerResponse>) => {
   else if (m.op === 'generate') p.resolve(m.traj);
   else if (m.op === 'psf') p.resolve(m.result);
   else if (m.op === 'golden') p.resolve(m.report);
+  else if (m.op === 'hedgehog') p.resolve(m.pts);
 };
 
 // ---------------------------------------------------------------- state
@@ -427,26 +428,10 @@ function renderPolyhedron() {
 
 // ---------------------------------------------------------------- angles tab
 
-// Unit spoke direction of each interleave = its last finite k-space sample
-// (bent-spiral endpoint on the kmax sphere). NaN tails from slew violations
-// are skipped backwards.
-function spokeDirs(t: TrajData, ilvs: number[]): { pts: Float32Array; count: number } {
-  const pts = new Float32Array(ilvs.length * 3);
-  let m = 0;
-  for (const g of ilvs) {
-    const irep = Math.floor(g / t.NI), j = g % t.NI;
-    const base = irep * t.NI * t.NPTS + j * t.NPTS;
-    for (let p = t.NPTS - 1; p >= 0; p--) {
-      const x = t.kx[base + p], y = t.ky[base + p], z = t.kz[base + p];
-      const h = Math.hypot(x, y, z);
-      if (Number.isFinite(h) && h > 1e-9) {
-        pts[3 * m] = x / h; pts[3 * m + 1] = y / h; pts[3 * m + 2] = z / h; m++;
-        break;
-      }
-    }
-  }
-  return { pts: pts.subarray(0, 3 * m) as Float32Array, count: m };
-}
+// Standalone Thomson spokes for a user-picked N (independent of the generated
+// trajectory) — same calchedgehog the generator uses for its charge basis, so
+// N = NI with optimization on reproduces the generator's interleave directions
+// exactly.
 
 function pairAnglesDeg(pts: Float32Array, count: number): number[] {
   const out: number[] = [];
@@ -458,41 +443,38 @@ function pairAnglesDeg(pts: Float32Array, count: number): number[] {
   return out;
 }
 
-const SPOKE_CAP = 1024;   // pairwise cost is O(n²); 1024 → ~0.5M pairs, still ms
+const hedgehogCache = new Map<string, Float32Array>();
 
-function renderAngles() {
-  if (!traj) return;
-  const which = ($('angles-which') as HTMLSelectElement).value;
-  let pts: Float32Array, count: number, what: string, strideNote = '';
-  if (which === 'basis') {
-    pts = traj.basis; count = traj.NI; what = `charge basis (NI = ${traj.NI})`;
-  } else if (which === 'reprot') {
-    pts = traj.reprot; count = traj.NREPS; what = `rotation axes (NREPS = ${traj.NREPS})`;
-  } else {
-    let ilvs = currentEnsemble();
-    if (ilvs.length > SPOKE_CAP) {
-      const stride = Math.ceil(ilvs.length / SPOKE_CAP);
-      ilvs = ilvs.filter((_, i) => i % stride === 0);
-      strideNote = ` · every ${stride}ᵗʰ of the ensemble (cap ${SPOKE_CAP})`;
-    }
-    const d = spokeDirs(traj, ilvs);
-    pts = d.pts; count = d.count;
-    const expr = ($('ens-expr') as HTMLInputElement).value.trim() || 'all';
-    what = `ensemble "${expr}" endpoint directions (${count} ilv)`;
+async function renderAngles() {
+  const nEl = $('angles-N') as HTMLInputElement;
+  const N = Math.min(256, Math.max(2, parseInt(nEl.value, 10) || 26));
+  nEl.value = `${N}`;
+  const opt = ($('angles-opt') as HTMLInputElement).checked;
+  const key = `${N}|${opt}`;
+  let pts = hedgehogCache.get(key);
+  if (!pts) {
+    setStatus(`solving Thomson configuration N = ${N}…`, 'busy');
+    try {
+      pts = await request<Float32Array>('hedgehog', { n: N, optimize: opt });
+    } catch { return; /* status set */ }
+    hedgehogCache.set(key, pts);
+    setStatus(`Thomson N = ${N} ready`);
   }
-  if (count < 2) { $('angles-note').textContent = 'need ≥ 2 spokes'; return; }
-  const angles = pairAnglesDeg(pts, count);
+  const angles = pairAnglesDeg(pts, N);
   let min = 180, sum = 0;
   for (const a of angles) { if (a < min) min = a; sum += a; }
   const bin = parseFloat(($('angles-bin') as HTMLSelectElement).value) || 2;
-  plots.plotSpokes($('plot-spokes'), pts, count, `${count} radial spokes — ${what}`);
+  const named = opt ? THOMSON_NAMES[N] : undefined;
+  plots.plotSpokes($('plot-spokes'), pts, N,
+    `${N} ${opt ? 'Thomson' : 'Fibonacci (unoptimized)'} spokes${named ? ` — ${named}` : ''}`);
   plots.plotAngleHist($('plot-anghist'), angles, bin,
     `pairwise angular separations — ${angles.length.toLocaleString()} pairs`);
   $('angles-note').textContent =
-    `min ${min.toFixed(1)}° · mean ${(sum / angles.length).toFixed(1)}°${strideNote}`;
+    `min ${min.toFixed(1)}° · mean ${(sum / angles.length).toFixed(1)}°` +
+    (named ? ` · ${named}` : '');
 }
 
-for (const id of ['angles-which', 'angles-bin'])
+for (const id of ['angles-N', 'angles-opt', 'angles-bin'])
   $(id).addEventListener('change', () => { rendered.delete('angles'); renderActive(); });
 
 // ---------------------------------------------------------------- metrics table

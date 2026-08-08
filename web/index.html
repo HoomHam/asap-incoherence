@@ -229,11 +229,10 @@
         </div>
         <div class="view" id="view-angles">
           <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:8px">
-            <select id="angles-which" style="flex-shrink:0">
-              <option value="basis" selected>charge basis (NI spokes)</option>
-              <option value="reprot">rotation axes (NREPS)</option>
-              <option value="ensemble">ensemble spoke directions</option>
-            </select>
+            <label class="note" style="margin:0;display:flex;align-items:center;gap:6px;flex-shrink:0">N spokes
+              <input type="number" id="angles-N" min="2" max="256" value="26" style="width:70px"></label>
+            <label class="note" style="margin:0;display:flex;align-items:center;gap:6px;flex-shrink:0">Thomson opt.
+              <input type="checkbox" id="angles-opt" checked></label>
             <label class="note" style="margin:0;display:flex;align-items:center;gap:6px;flex-shrink:0">bin
               <select id="angles-bin">
                 <option value="1">1°</option>
