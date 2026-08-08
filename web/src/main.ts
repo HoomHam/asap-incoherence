@@ -477,6 +477,17 @@ async function renderAngles() {
 for (const id of ['angles-N', 'angles-opt', 'angles-bin'])
   $(id).addEventListener('change', () => { rendered.delete('angles'); renderActive(); });
 
+// N follows the sidebar interleave count (manual tab override holds until the
+// sidebar NI changes again); Thomson-opt follows the generator toggle likewise
+$('p-NI').addEventListener('input', () => {
+  ($('angles-N') as HTMLInputElement).value = ($('p-NI') as HTMLInputElement).value;
+  rendered.delete('angles'); renderActive();
+});
+$('p-opt').addEventListener('change', () => {
+  ($('angles-opt') as HTMLInputElement).checked = ($('p-opt') as HTMLInputElement).checked;
+  rendered.delete('angles'); renderActive();
+});
+
 // ---------------------------------------------------------------- metrics table
 
 function fmt(v: number, d = 3) { return Number.isFinite(v) ? v.toFixed(d) : '—'; }
