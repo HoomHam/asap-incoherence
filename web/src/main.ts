@@ -446,10 +446,10 @@ function pairAnglesDeg(pts: Float32Array, count: number): number[] {
 const hedgehogCache = new Map<string, Float32Array>();
 
 async function renderAngles() {
-  // mirrors the sidebar: N = # charges (NI), optimization = the generator toggle
+  // N mirrors the sidebar # charges (NI); Thomson vs Fibonacci is the tab radio
   const N = Math.min(256, Math.max(2, parseInt(($('p-NI') as HTMLInputElement).value, 10) || 26));
-  const opt = ($('p-opt') as HTMLInputElement).checked;
-  $('angles-n-pill').textContent = `N = ${N}${opt ? '' : ' (no Thomson opt.)'}`;
+  const opt = ($('angles-mode-thomson') as HTMLInputElement).checked;
+  $('angles-n-pill').textContent = `N = ${N}`;
   const key = `${N}|${opt}`;
   let pts = hedgehogCache.get(key);
   if (!pts) {
@@ -474,12 +474,12 @@ async function renderAngles() {
     (named ? ` · ${named}` : '');
 }
 
-$('angles-bin').addEventListener('change', () => { rendered.delete('angles'); renderActive(); });
+for (const id of ['angles-bin', 'angles-mode-thomson', 'angles-mode-fib'])
+  $(id).addEventListener('change', () => { rendered.delete('angles'); renderActive(); });
 
-// the tab has no N of its own — it re-solves live as the sidebar NI / Thomson
-// toggle change, no regeneration needed
+// the tab has no N of its own — it re-solves live as the sidebar NI changes,
+// no regeneration needed
 $('p-NI').addEventListener('input', () => { rendered.delete('angles'); renderActive(); });
-$('p-opt').addEventListener('change', () => { rendered.delete('angles'); renderActive(); });
 
 // ---------------------------------------------------------------- metrics table
 
