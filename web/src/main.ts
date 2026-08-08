@@ -446,10 +446,10 @@ function pairAnglesDeg(pts: Float32Array, count: number): number[] {
 const hedgehogCache = new Map<string, Float32Array>();
 
 async function renderAngles() {
-  const nEl = $('angles-N') as HTMLInputElement;
-  const N = Math.min(256, Math.max(2, parseInt(nEl.value, 10) || 26));
-  nEl.value = `${N}`;
-  const opt = ($('angles-opt') as HTMLInputElement).checked;
+  // mirrors the sidebar: N = # charges (NI), optimization = the generator toggle
+  const N = Math.min(256, Math.max(2, parseInt(($('p-NI') as HTMLInputElement).value, 10) || 26));
+  const opt = ($('p-opt') as HTMLInputElement).checked;
+  $('angles-n-pill').textContent = `N = ${N}${opt ? '' : ' (no Thomson opt.)'}`;
   const key = `${N}|${opt}`;
   let pts = hedgehogCache.get(key);
   if (!pts) {
@@ -474,19 +474,12 @@ async function renderAngles() {
     (named ? ` · ${named}` : '');
 }
 
-for (const id of ['angles-N', 'angles-opt', 'angles-bin'])
-  $(id).addEventListener('change', () => { rendered.delete('angles'); renderActive(); });
+$('angles-bin').addEventListener('change', () => { rendered.delete('angles'); renderActive(); });
 
-// N follows the sidebar interleave count (manual tab override holds until the
-// sidebar NI changes again); Thomson-opt follows the generator toggle likewise
-$('p-NI').addEventListener('input', () => {
-  ($('angles-N') as HTMLInputElement).value = ($('p-NI') as HTMLInputElement).value;
-  rendered.delete('angles'); renderActive();
-});
-$('p-opt').addEventListener('change', () => {
-  ($('angles-opt') as HTMLInputElement).checked = ($('p-opt') as HTMLInputElement).checked;
-  rendered.delete('angles'); renderActive();
-});
+// the tab has no N of its own — it re-solves live as the sidebar NI / Thomson
+// toggle change, no regeneration needed
+$('p-NI').addEventListener('input', () => { rendered.delete('angles'); renderActive(); });
+$('p-opt').addEventListener('change', () => { rendered.delete('angles'); renderActive(); });
 
 // ---------------------------------------------------------------- metrics table
 
